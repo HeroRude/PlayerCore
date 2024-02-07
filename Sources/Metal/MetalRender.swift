@@ -158,6 +158,12 @@ class MetalRender {
     func drawPlane(pixelBuffer: PixelBufferProtocol, display: DisplayEnum = .plane, drawable: CAMetalDrawable) {
         let inputTextures = pixelBuffer.textures()
         renderPassDescriptor.colorAttachments[0].texture = drawable.texture
+        renderPassDescriptor.colorAttachments[0].loadAction = .clear
+        renderPassDescriptor.colorAttachments[0].storeAction = .store
+        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
+        renderPassDescriptor.depthAttachment.texture = nil
+        renderPassDescriptor.rasterizationRateMap = nil
+        renderPassDescriptor.renderTargetArrayLength = 1
         guard !inputTextures.isEmpty, let commandBuffer = commandQueue?.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
             return
         }
@@ -236,6 +242,15 @@ class MetalRender {
             self.uniforms[0].uniforms.1 = uniforms(drawable: drawable, deviceAnchor: deviceAnchor, forViewIndex: 1)
         }
         encoder.setVertexBuffer(dynamicUniformBuffer, offset: uniformBufferOffset, index: 9)
+        let viewports = drawable.views.map { $0.textureMap.viewport }
+        encoder.setViewports(viewports)
+        if drawable.views.count > 1 {
+            var viewMappings = (0..<drawable.views.count).map {
+                MTLVertexAmplificationViewMapping(viewportArrayIndexOffset: UInt32($0),
+                                                  renderTargetArrayIndexOffset: UInt32($0))
+            }
+            encoder.setVertexAmplificationCount(viewports.count, viewMappings: &viewMappings)
+        }
         
 //        let simdDeviceAnchor = deviceAnchor?.originFromAnchorTransform ?? matrix_identity_float4x4
 //        let viewMatrix = (simdDeviceAnchor * drawable.views[0].transform).inverse
@@ -338,14 +353,16 @@ class MetalRender {
     }
 
     static func makePipelineState(fragmentFunction: String, isSphere: Bool = false, bitDepth: Int32 = 8) -> MTLRenderPipelineState {
-        let layerRenderer = MetalRender.options?.layerRenderer
         
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.colorAttachments[0].pixelFormat = MoonOptions.colorPixelFormat(bitDepth: bitDepth)
-        descriptor.depthAttachmentPixelFormat = layerRenderer!.configuration.depthFormat
         descriptor.vertexFunction = library.makeFunction(name: isSphere ? "mapSphereTexture" : "mapTexture")
         descriptor.fragmentFunction = library.makeFunction(name: fragmentFunction)
-        descriptor.maxVertexAmplificationCount = layerRenderer!.properties.viewCount
+        
+        if let layerRenderer = MetalRender.options?.layerRenderer {
+            descriptor.depthAttachmentPixelFormat = layerRenderer.configuration.depthFormat
+            descriptor.maxVertexAmplificationCount = layerRenderer.properties.viewCount
+        }
         
         let vertexDescriptor = MTLVertexDescriptor()
         vertexDescriptor.attributes[0].format = .float4

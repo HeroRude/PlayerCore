@@ -1,12 +1,24 @@
 //
 //  Shaders.metal
 #include <metal_stdlib>
+#include <simd/simd.h>
 using namespace metal;
 
-struct CustomData {
+typedef struct {
     int stereoMode;
     uint frameCounter;
-};
+} CustomData;
+
+typedef struct
+{
+    matrix_float4x4 projectionMatrix;
+    matrix_float4x4 modelViewMatrix;
+} Uniforms;
+
+typedef struct
+{
+    Uniforms uniforms[2];
+} UniformsArray;
 
 struct VertexIn
 {
@@ -38,9 +50,13 @@ vertex VertexOut mapTexture(VertexIn input [[stage_in]]) {
     return outVertex;
 }
 
-vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]], constant float4x4& uniforms [[ buffer(2) ]]) {
+vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]],
+                                  ushort ampId [[ amplification_id ]],
+                                  constant UniformsArray & uniformsArray [[ buffer(9) ]]) {
     VertexOut outVertex;
-    outVertex.renderedCoordinate = uniforms * input.pos;
+    Uniforms uniforms = uniformsArray.uniforms[ampId];
+    
+    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * input.pos;
     outVertex.textureCoordinate = input.uv;
     return outVertex;
 }

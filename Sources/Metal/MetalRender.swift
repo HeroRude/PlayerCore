@@ -11,6 +11,7 @@ import Metal
 import QuartzCore
 import simd
 import CompositorServices
+import Spatial
 
 struct CustomData {
     public var stereoMode: Int = 0
@@ -53,6 +54,11 @@ class MetalRender {
     private let worldTracking: WorldTrackingProvider
     private let arSession: ARKitSession
     private let renderPassDescriptor = MTLRenderPassDescriptor()
+    private var dynamicUniformBuffer: MTLBuffer
+    private var depthState: MTLDepthStencilState
+    private var uniforms: UnsafeMutablePointer<UniformsArray>
+    private var uniformBufferOffset = 0
+    private var uniformBufferIndex = 0
     private let commandQueue = MetalRender.device.makeCommandQueue()
     private lazy var samplerState: MTLSamplerState? = {
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -114,6 +120,19 @@ class MetalRender {
     public init() {
         worldTracking = WorldTrackingProvider()
         arSession = ARKitSession()
+        
+        // DynamicUniformBuffer
+        let uniformBufferSize = alignedUniformsSize * maxBuffersInFlight
+        self.dynamicUniformBuffer = MetalRender.device.makeBuffer(length:uniformBufferSize, options:[MTLResourceOptions.storageModeShared])!
+        self.dynamicUniformBuffer.label = "UniformBuffer"
+        uniforms = UnsafeMutableRawPointer(dynamicUniformBuffer.contents()).bindMemory(to:UniformsArray.self, capacity:1)
+        
+        // DepthStencilState
+        let depthStateDescriptor = MTLDepthStencilDescriptor()
+        depthStateDescriptor.depthCompareFunction = MTLCompareFunction.greater
+        depthStateDescriptor.isDepthWriteEnabled = true
+        self.depthState = MetalRender.device.makeDepthStencilState(descriptor:depthStateDescriptor)!
+        
         Task {
             do {
                 try await arSession.run([worldTracking])
@@ -125,7 +144,6 @@ class MetalRender {
     
     func clear(drawable: MTLDrawable) {
         renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
-        renderPassDescriptor.colorAttachments[0].loadAction = .clear
         guard let commandBuffer = commandQueue?.makeCommandBuffer(),
               let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else {
@@ -152,7 +170,7 @@ class MetalRender {
             encoder.setFragmentTexture(texture, index: index)
         }
         setFragmentBuffer(pixelBuffer: pixelBuffer, encoder: encoder)
-        display.set(encoder: encoder, viewMatrix: simd_float4x4())
+        display.set(encoder: encoder)
         encoder.popDebugGroup()
         encoder.endEncoding()
         commandBuffer.present(drawable)
@@ -186,6 +204,18 @@ class MetalRender {
     
         let inputTextures = pixelBuffer.textures()
         renderPassDescriptor.colorAttachments[0].texture = drawable.colorTextures[0]
+        renderPassDescriptor.colorAttachments[0].loadAction = .clear
+        renderPassDescriptor.colorAttachments[0].storeAction = .store
+        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
+        renderPassDescriptor.depthAttachment.texture = drawable.depthTextures[0]
+        renderPassDescriptor.depthAttachment.loadAction = .clear
+        renderPassDescriptor.depthAttachment.storeAction = .store
+        renderPassDescriptor.depthAttachment.clearDepth = 0.0
+        renderPassDescriptor.rasterizationRateMap = drawable.rasterizationRateMaps.first
+        if layerRenderer.configuration.layout == .layered {
+            renderPassDescriptor.renderTargetArrayLength = drawable.views.count
+        }
+        
         guard !inputTextures.isEmpty, let commandBuffer = commandQueue!.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
             return
         }
@@ -198,9 +228,17 @@ class MetalRender {
         encoder.pushDebugGroup("RenderFrame")
         let state = display.pipeline(planeCount: pixelBuffer.planeCount, bitDepth: pixelBuffer.bitDepth)
         encoder.setRenderPipelineState(state)
+        encoder.setDepthStencilState(depthState)
         
-        let simdDeviceAnchor = deviceAnchor?.originFromAnchorTransform ?? matrix_identity_float4x4
-        let viewMatrix = (simdDeviceAnchor * drawable.views[0].transform).inverse
+        self.updateDynamicBufferState()
+        self.uniforms[0].uniforms.0 = uniforms(drawable: drawable, deviceAnchor: deviceAnchor, forViewIndex: 0)
+        if drawable.views.count > 1 {
+            self.uniforms[0].uniforms.1 = uniforms(drawable: drawable, deviceAnchor: deviceAnchor, forViewIndex: 1)
+        }
+        encoder.setVertexBuffer(dynamicUniformBuffer, offset: uniformBufferOffset, index: 9)
+        
+//        let simdDeviceAnchor = deviceAnchor?.originFromAnchorTransform ?? matrix_identity_float4x4
+//        let viewMatrix = (simdDeviceAnchor * drawable.views[0].transform).inverse
         
         encoder.setFragmentSamplerState(samplerState, index: 0)
         for (index, texture) in inputTextures.enumerated() {
@@ -208,7 +246,7 @@ class MetalRender {
             encoder.setFragmentTexture(texture, index: index)
         }
         setFragmentBuffer(pixelBuffer: pixelBuffer, encoder: encoder)
-        display.set(encoder: encoder, viewMatrix: viewMatrix)
+        display.set(encoder: encoder)
         encoder.popDebugGroup()
         encoder.endEncoding()
         drawable.encodePresent(commandBuffer: commandBuffer)
@@ -250,12 +288,65 @@ class MetalRender {
             encoder.setFragmentBuffer(customDataBuffer, offset: 0, index: 3)
         }
     }
+    
+    private func updateDynamicBufferState() {
+        uniformBufferIndex = (uniformBufferIndex + 1) % maxBuffersInFlight
+        uniformBufferOffset = alignedUniformsSize * uniformBufferIndex
+        uniforms = UnsafeMutableRawPointer(dynamicUniformBuffer.contents() + uniformBufferOffset).bindMemory(to:UniformsArray.self, capacity:1)
+    }
+    
+    private func uniforms(drawable: LayerRenderer.Drawable, deviceAnchor: DeviceAnchor?, forViewIndex viewIndex: Int) -> Uniforms {
+        let modelTranslationMatrix = matrix4x4_translation(0.0, 0.0, 0.0)
+        let modelMatrix = modelTranslationMatrix
+        
+        let simdDeviceAnchor = deviceAnchor?.originFromAnchorTransform ?? matrix_identity_float4x4
+        let view = drawable.views[viewIndex]
+        let viewMatrix = (simdDeviceAnchor * view.transform).inverse
+        let projection = ProjectiveTransform3D(leftTangent: Double(view.tangents[0]),
+                                               rightTangent: Double(view.tangents[1]),
+                                               topTangent: Double(view.tangents[2]),
+                                               bottomTangent: Double(view.tangents[3]),
+                                               nearZ: Double(drawable.depthRange.y),
+                                               farZ: Double(drawable.depthRange.x),
+                                               reverseZ: true)
+        
+        return Uniforms(projectionMatrix: .init(projection), modelViewMatrix: viewMatrix * modelMatrix)
+    }
+    
+    // Generic matrix math utility functions
+    private func matrix4x4_rotation(radians: Float, axis: SIMD3<Float>) -> matrix_float4x4 {
+        let unitAxis = normalize(axis)
+        let ct = cosf(radians)
+        let st = sinf(radians)
+        let ci = 1 - ct
+        let x = unitAxis.x, y = unitAxis.y, z = unitAxis.z
+        return matrix_float4x4.init(columns:(vector_float4(    ct + x * x * ci, y * x * ci + z * st, z * x * ci - y * st, 0),
+                                             vector_float4(x * y * ci - z * st,     ct + y * y * ci, z * y * ci + x * st, 0),
+                                             vector_float4(x * z * ci + y * st, y * z * ci - x * st,     ct + z * z * ci, 0),
+                                             vector_float4(                  0,                   0,                   0, 1)))
+    }
+
+    private func matrix4x4_translation(_ translationX: Float, _ translationY: Float, _ translationZ: Float) -> matrix_float4x4 {
+        return matrix_float4x4.init(columns:(vector_float4(1, 0, 0, 0),
+                                             vector_float4(0, 1, 0, 0),
+                                             vector_float4(0, 0, 1, 0),
+                                             vector_float4(translationX, translationY, translationZ, 1)))
+    }
+
+    private func radians_from_degrees(_ degrees: Float) -> Float {
+        return (degrees / 180) * .pi
+    }
 
     static func makePipelineState(fragmentFunction: String, isSphere: Bool = false, bitDepth: Int32 = 8) -> MTLRenderPipelineState {
+        let layerRenderer = MetalRender.options?.layerRenderer
+        
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.colorAttachments[0].pixelFormat = MoonOptions.colorPixelFormat(bitDepth: bitDepth)
+        descriptor.depthAttachmentPixelFormat = layerRenderer!.configuration.depthFormat
         descriptor.vertexFunction = library.makeFunction(name: isSphere ? "mapSphereTexture" : "mapTexture")
         descriptor.fragmentFunction = library.makeFunction(name: fragmentFunction)
+        descriptor.maxVertexAmplificationCount = layerRenderer!.properties.viewCount
+        
         let vertexDescriptor = MTLVertexDescriptor()
         vertexDescriptor.attributes[0].format = .float4
         vertexDescriptor.attributes[0].bufferIndex = 0
@@ -263,8 +354,8 @@ class MetalRender {
         vertexDescriptor.attributes[1].format = .float2
         vertexDescriptor.attributes[1].bufferIndex = 1
         vertexDescriptor.attributes[1].offset = 0
-        vertexDescriptor.layouts[0].stride = MemoryLayout<simd_float4>.stride
-        vertexDescriptor.layouts[1].stride = MemoryLayout<simd_float2>.stride
+        vertexDescriptor.layouts[0].stride = 16
+        vertexDescriptor.layouts[1].stride = 8
         descriptor.vertexDescriptor = vertexDescriptor
         // swiftlint:disable force_try
         return try! library.device.makeRenderPipelineState(descriptor: descriptor)

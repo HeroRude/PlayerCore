@@ -18,16 +18,16 @@ extension DisplayEnum {
     private static var vrBoxDiaplay = VRBoxDisplayModel()
     private static var vrDomeDisplay = VRDomeDisplayModel()
 
-    func set(encoder: MTLRenderCommandEncoder, viewMatrix: simd_float4x4) {
+    func set(encoder: MTLRenderCommandEncoder) {
         switch self {
         case .plane:
-            DisplayEnum.planeDisplay.set(encoder: encoder, viewMatrix: viewMatrix)
+            DisplayEnum.planeDisplay.set(encoder: encoder)
         case .vr:
-            DisplayEnum.vrDiaplay.set(encoder: encoder, viewMatrix: viewMatrix)
+            DisplayEnum.vrDiaplay.set(encoder: encoder)
         case .vrBox:
-            DisplayEnum.vrBoxDiaplay.set(encoder: encoder, viewMatrix: viewMatrix)
+            DisplayEnum.vrBoxDiaplay.set(encoder: encoder)
         case .vrDome:
-            DisplayEnum.vrDomeDisplay.set(encoder: encoder, viewMatrix: viewMatrix)
+            DisplayEnum.vrDomeDisplay.set(encoder: encoder)
         }
     }
 
@@ -84,7 +84,7 @@ private class PlaneDisplayModel {
         return (indices, positions, uvs)
     }
 
-    func set(encoder: MTLRenderCommandEncoder, viewMatrix: simd_float4x4) {
+    func set(encoder: MTLRenderCommandEncoder) {
         encoder.setFrontFacing(.clockwise)
         encoder.setVertexBuffer(posBuffer, offset: 0, index: 0)
         encoder.setVertexBuffer(uvBuffer, offset: 0, index: 1)
@@ -137,7 +137,7 @@ private class SphereDisplayModel {
         uvBuffer = device.makeBuffer(bytes: uvs, length: MemoryLayout<simd_float2>.size * uvs.count)
     }
 
-    func set(encoder: MTLRenderCommandEncoder, viewMatrix: simd_float4x4) {
+    func set(encoder: MTLRenderCommandEncoder) {
         encoder.setFrontFacing(.clockwise)
         encoder.setVertexBuffer(posBuffer, offset: 0, index: 0)
         encoder.setVertexBuffer(uvBuffer, offset: 0, index: 1)
@@ -238,7 +238,7 @@ private class DomeDisplayModel {
         uvBuffer = device.makeBuffer(bytes: uvs, length: MemoryLayout<simd_float2>.size * uvs.count)
     }
 
-    func set(encoder: MTLRenderCommandEncoder, viewMatrix: simd_float4x4) {
+    func set(encoder: MTLRenderCommandEncoder) {
         encoder.setFrontFacing(.clockwise)
         encoder.setVertexBuffer(posBuffer, offset: 0, index: 0)
         encoder.setVertexBuffer(uvBuffer, offset: 0, index: 1)
@@ -326,9 +326,9 @@ private class VRDisplayModel: SphereDisplayModel {
         super.init()
     }
 
-    override func set(encoder: MTLRenderCommandEncoder, viewMatrix: simd_float4x4) {
-        super.set(encoder: encoder, viewMatrix: viewMatrix)
-        var matrix = modelViewProjectionMatrix * modelViewMatrix * viewMatrix
+    override func set(encoder: MTLRenderCommandEncoder) {
+        super.set(encoder: encoder)
+        var matrix = modelViewProjectionMatrix * modelViewMatrix
         let matrixBuffer = MetalRender.device.makeBuffer(bytes: &matrix, length: MemoryLayout<simd_float4x4>.size)
         encoder.setVertexBuffer(matrixBuffer, offset: 0, index: 2)
         encoder.drawIndexedPrimitives(type: primitiveType, indexCount: indexCount, indexType: indexType, indexBuffer: indexBuffer, indexBufferOffset: 0)
@@ -346,9 +346,9 @@ private class VRDomeDisplayModel: DomeDisplayModel {
         super.init()
     }
 
-    override func set(encoder: MTLRenderCommandEncoder, viewMatrix: simd_float4x4) {
-        super.set(encoder: encoder, viewMatrix: viewMatrix)
-        var matrix = modelViewProjectionMatrix * modelViewMatrix * viewMatrix
+    override func set(encoder: MTLRenderCommandEncoder) {
+        super.set(encoder: encoder)
+        var matrix = modelViewProjectionMatrix * modelViewMatrix
         let matrixBuffer = MetalRender.device.makeBuffer(bytes: &matrix, length: MemoryLayout<simd_float4x4>.size)
         encoder.setVertexBuffer(matrixBuffer, offset: 0, index: 2)
         encoder.drawIndexedPrimitives(type: primitiveType, indexCount: indexCount, indexType: indexType, indexBuffer: indexBuffer, indexBufferOffset: 0)
@@ -369,8 +369,8 @@ private class VRBoxDisplayModel: SphereDisplayModel {
         super.init()
     }
 
-    override func set(encoder: MTLRenderCommandEncoder, viewMatrix: simd_float4x4) {
-        super.set(encoder: encoder, viewMatrix: viewMatrix)
+    override func set(encoder: MTLRenderCommandEncoder) {
+        super.set(encoder: encoder)
         let layerSize = MoonOptions.sceneSize
         let width = Double(layerSize.width / 2)
         [(modelViewProjectionMatrixLeft, MTLViewport(originX: 0, originY: 0, width: width, height: Double(layerSize.height), znear: 0, zfar: 0)),

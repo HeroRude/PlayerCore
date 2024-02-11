@@ -53,7 +53,9 @@ class MetalRender {
 
     private let worldTracking: WorldTrackingProvider
     private let arSession: ARKitSession
-    private let renderPassDescriptor = MTLRenderPassDescriptor()
+    private var lastPassDescriptor: MTLRenderPassDescriptor?
+    private let immersivePassDescriptor = MTLRenderPassDescriptor()
+    private let planePassDescriptor = MTLRenderPassDescriptor()
     private var dynamicUniformBuffer: MTLBuffer
     private var depthState: MTLDepthStencilState
     private var uniforms: UnsafeMutablePointer<UniformsArray>
@@ -143,9 +145,12 @@ class MetalRender {
     }
     
     func clear(drawable: MTLDrawable) {
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        guard let passDescriptor = lastPassDescriptor else {
+            return
+        }
+        passDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         guard let commandBuffer = commandQueue?.makeCommandBuffer(),
-              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
+              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor)
         else {
             return
         }
@@ -157,18 +162,22 @@ class MetalRender {
 
     func drawPlane(pixelBuffer: PixelBufferProtocol, display: DisplayEnum = .plane, drawable: CAMetalDrawable) {
         let inputTextures = pixelBuffer.textures()
-        renderPassDescriptor.colorAttachments[0].texture = drawable.texture
-        renderPassDescriptor.colorAttachments[0].loadAction = .clear
-        renderPassDescriptor.colorAttachments[0].storeAction = .store
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
-        renderPassDescriptor.depthAttachment.texture = nil
-        renderPassDescriptor.rasterizationRateMap = nil
-        renderPassDescriptor.renderTargetArrayLength = 1
-        guard !inputTextures.isEmpty, let commandBuffer = commandQueue?.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
+        lastPassDescriptor = planePassDescriptor
+        planePassDescriptor.colorAttachments[0].texture = drawable.texture
+        planePassDescriptor.renderTargetArrayLength = 1
+        guard !inputTextures.isEmpty, let commandBuffer = commandQueue?.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: planePassDescriptor) else {
             return
         }
         encoder.pushDebugGroup("RenderFrame")
         let state = display.pipeline(planeCount: pixelBuffer.planeCount, bitDepth: pixelBuffer.bitDepth)
+        if MetalRender.device.supportsVertexAmplificationCount(2) {
+            var viewMappings = (0..<2).map {
+                MTLVertexAmplificationViewMapping(viewportArrayIndexOffset: UInt32($0),
+                                                  renderTargetArrayIndexOffset: UInt32($0))
+            }
+            
+            encoder.setVertexAmplificationCount(2, viewMappings: &viewMappings)
+        }
         encoder.setRenderPipelineState(state)
         encoder.setFragmentSamplerState(samplerState, index: 0)
         for (index, texture) in inputTextures.enumerated() {
@@ -209,20 +218,21 @@ class MetalRender {
         drawable.deviceAnchor = deviceAnchor
     
         let inputTextures = pixelBuffer.textures()
-        renderPassDescriptor.colorAttachments[0].texture = drawable.colorTextures[0]
-        renderPassDescriptor.colorAttachments[0].loadAction = .clear
-        renderPassDescriptor.colorAttachments[0].storeAction = .store
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
-        renderPassDescriptor.depthAttachment.texture = drawable.depthTextures[0]
-        renderPassDescriptor.depthAttachment.loadAction = .clear
-        renderPassDescriptor.depthAttachment.storeAction = .store
-        renderPassDescriptor.depthAttachment.clearDepth = 0.0
-        renderPassDescriptor.rasterizationRateMap = drawable.rasterizationRateMaps.first
+        lastPassDescriptor = immersivePassDescriptor
+        immersivePassDescriptor.colorAttachments[0].texture = drawable.colorTextures[0]
+        immersivePassDescriptor.colorAttachments[0].loadAction = .clear
+        immersivePassDescriptor.colorAttachments[0].storeAction = .store
+        immersivePassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
+        immersivePassDescriptor.depthAttachment.texture = drawable.depthTextures[0]
+        immersivePassDescriptor.depthAttachment.loadAction = .clear
+        immersivePassDescriptor.depthAttachment.storeAction = .store
+        immersivePassDescriptor.depthAttachment.clearDepth = 0.0
+        immersivePassDescriptor.rasterizationRateMap = drawable.rasterizationRateMaps.first
         if layerRenderer.configuration.layout == .layered {
-            renderPassDescriptor.renderTargetArrayLength = drawable.views.count
+            immersivePassDescriptor.renderTargetArrayLength = drawable.views.count
         }
         
-        guard !inputTextures.isEmpty, let commandBuffer = commandQueue!.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
+        guard !inputTextures.isEmpty, let commandBuffer = commandQueue!.makeCommandBuffer(), let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: immersivePassDescriptor) else {
             return
         }
         
@@ -300,6 +310,7 @@ class MetalRender {
             
             // Custom data
             updateCustomDataBuffer()
+            encoder.setVertexBuffer(customDataBuffer, offset: 0, index: 3)
             encoder.setFragmentBuffer(customDataBuffer, offset: 0, index: 3)
         }
     }
@@ -359,9 +370,14 @@ class MetalRender {
         descriptor.vertexFunction = library.makeFunction(name: isSphere ? "mapSphereTexture" : "mapTexture")
         descriptor.fragmentFunction = library.makeFunction(name: fragmentFunction)
         
-        if let layerRenderer = MetalRender.options?.layerRenderer {
-            descriptor.depthAttachmentPixelFormat = layerRenderer.configuration.depthFormat
-            descriptor.maxVertexAmplificationCount = layerRenderer.properties.viewCount
+        if isSphere {
+            if let layerRenderer = MetalRender.options?.layerRenderer {
+                descriptor.depthAttachmentPixelFormat = layerRenderer.configuration.depthFormat
+                descriptor.maxVertexAmplificationCount = layerRenderer.properties.viewCount
+            }
+        } else {
+            descriptor.depthAttachmentPixelFormat = .invalid
+            descriptor.maxVertexAmplificationCount = MetalRender.device.supportsVertexAmplificationCount(2) ? 2 : 1
         }
         
         let vertexDescriptor = MTLVertexDescriptor()

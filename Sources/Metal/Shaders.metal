@@ -43,21 +43,55 @@ inline half4 gammaToLinear(half4 col) {
     return half4(colRGB, col.a); // 重新构建包含修改后的RGB分量和原始Alpha分量的half4
 }
 
-vertex VertexOut mapTexture(VertexIn input [[stage_in]]) {
+vertex VertexOut mapTexture(VertexIn input [[stage_in]],
+                            ushort ampId [[ amplification_id ]],
+                            constant CustomData & customData [[ buffer(3) ]]) {
     VertexOut outVertex;
+    float2 texCoord = input.uv;
+    
     outVertex.renderedCoordinate = input.pos;
-    outVertex.textureCoordinate = input.uv;
+    if (customData.stereoMode == 1) {
+        if (ampId == 0) {
+            texCoord.x = texCoord.x * 0.5 + 0.5;
+        } else {
+            texCoord.x = texCoord.x * 0.5;
+        }
+    } else if (customData.stereoMode == 2) {
+        if (ampId == 0) {
+            texCoord.y = texCoord.y * 0.5;
+        } else {
+            texCoord.y = texCoord.y * 0.5 + 0.5;
+        }
+    }
+    outVertex.textureCoordinate = texCoord;
     return outVertex;
 }
 
 vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]],
                                   ushort ampId [[ amplification_id ]],
+                                  constant CustomData& customData [[ buffer(3) ]],
                                   constant UniformsArray & uniformsArray [[ buffer(9) ]]) {
     VertexOut outVertex;
     Uniforms uniforms = uniformsArray.uniforms[ampId];
     
     outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * input.pos;
-    outVertex.textureCoordinate = input.uv;
+    float2 texCoord = input.uv;
+    
+    if (customData.stereoMode == 1) {
+        if (ampId == 0) {
+            texCoord.x = texCoord.x * 0.5;
+        } else {
+            texCoord.x = texCoord.x * 0.5 + 0.5;
+        }
+    } else if (customData.stereoMode == 2) {
+        if (ampId == 0) {
+            texCoord.y = texCoord.y * 0.5;
+        } else {
+            texCoord.y = texCoord.y * 0.5 + 0.5;
+        }
+    }
+    outVertex.textureCoordinate = texCoord;
+    
     return outVertex;
 }
 
@@ -65,28 +99,10 @@ fragment half4 displayTexture(VertexOut mappingVertex [[ stage_in ]],
                               texture2d<half, access::sample> texture [[ texture(0) ]],
                               constant CustomData& customData [[ buffer(3) ]]) {
     constexpr sampler s(address::clamp_to_edge, filter::linear);
-
-    bool isLeftEye = (customData.frameCounter % 2) == 0;
     float2 adjustedTexCoord = mappingVertex.textureCoordinate;
-    if (customData.stereoMode == 1) {
-        if (isLeftEye) {
-            adjustedTexCoord.x = adjustedTexCoord.x * 0.5;
-        } else {
-            adjustedTexCoord.x = adjustedTexCoord.x * 0.5 + 0.5;
-        }
-    } else if (customData.stereoMode == 2) {
-        if (isLeftEye) {
-            adjustedTexCoord.y = adjustedTexCoord.y * 0.5;
-        } else {
-            adjustedTexCoord.y = adjustedTexCoord.y * 0.5 + 0.5;
-        }
-    }
     
     half4 col = half4(texture.sample(s, adjustedTexCoord));
     half4 finalCol = gammaToLinear(col);
-    if (adjustedTexCoord.x < 0.0 || adjustedTexCoord.x > 1.0) {
-        finalCol = half4(0.0, 0.0, 0.0, 1.0);
-    }
     return finalCol;
 }
 
@@ -101,32 +117,13 @@ fragment half4 displayYUVTexture(VertexOut in [[ stage_in ]],
                                   constant CustomData& customData [[ buffer(3) ]])
 {
     half3 yuv;
-    bool isLeftEye = (customData.frameCounter % 2) == 0;
     float2 adjustedTexCoord = in.textureCoordinate;
-    if (customData.stereoMode == 1) {
-        if (isLeftEye) {
-            adjustedTexCoord.x = adjustedTexCoord.x * 0.5;
-        } else {
-            adjustedTexCoord.x = adjustedTexCoord.x * 0.5 + 0.5;
-        }
-    } else if (customData.stereoMode == 2) {
-        if (isLeftEye) {
-            adjustedTexCoord.y = adjustedTexCoord.y * 0.5;
-        } else {
-            adjustedTexCoord.y = adjustedTexCoord.y * 0.5 + 0.5;
-        }
-    }
+
     yuv.x = yTexture.sample(textureSampler, adjustedTexCoord).r;
     yuv.y = uTexture.sample(textureSampler, adjustedTexCoord).r;
     yuv.z = vTexture.sample(textureSampler, adjustedTexCoord).r;
     half4 col = half4(half3x3(yuvToBGRMatrix)*(yuv*half3(leftShift)+half3(colorOffset)), 1);
     half4 finalCol = gammaToLinear(col);
-            if (adjustedTexCoord.x < 0.0 || adjustedTexCoord.x > 1.0) {
-                finalCol = half4(0.0, 0.0, 0.0, 1.0);
-            }
-//    if (customData.displayMode == 3) {
-
-//    }
     return finalCol;
 }
 
@@ -141,28 +138,12 @@ fragment half4 displayNV12Texture(VertexOut in [[ stage_in ]],
                                   constant CustomData& customData [[ buffer(3) ]])
 {
     half3 yuv;
-    bool isLeftEye = (customData.frameCounter % 2) == 0;
     float2 adjustedTexCoord = in.textureCoordinate;
-    if (customData.stereoMode == 1) {
-        if (isLeftEye) {
-            adjustedTexCoord.x = adjustedTexCoord.x * 0.5;
-        } else {
-            adjustedTexCoord.x = adjustedTexCoord.x * 0.5 + 0.5;
-        }
-    } else if (customData.stereoMode == 2) {
-        if (isLeftEye) {
-            adjustedTexCoord.y = adjustedTexCoord.y * 0.5;
-        } else {
-            adjustedTexCoord.y = adjustedTexCoord.y * 0.5 + 0.5;
-        }
-    }
+
     yuv.x = lumaTexture.sample(textureSampler, adjustedTexCoord).r;
     yuv.yz = chromaTexture.sample(textureSampler, adjustedTexCoord).rg;
     half4 col = half4(half3x3(yuvToBGRMatrix)*(yuv*half3(leftShift)+half3(colorOffset)), 1);
     half4 finalCol = gammaToLinear(col);
-    if (adjustedTexCoord.x < 0.0 || adjustedTexCoord.x > 1.0) {
-        finalCol = half4(0.0, 0.0, 0.0, 1.0);
-    }
     return finalCol;
 }
 

@@ -253,37 +253,37 @@ private class DomeDisplayModel {
     private static func genDome() -> ([UInt16], [simd_float4], [simd_float2]) {
         let slicesCount = UInt16(200)
         let parallelsCount = slicesCount / 2
-        let indicesCount = Int(slicesCount) * Int(parallelsCount) * 6
+        let indicesCount = Int(slicesCount) * Int(parallelsCount) * 6 / 2
         var indices = [UInt16](repeating: 0, count: indicesCount)
         var positions = [simd_float4]()
         var uvs = [simd_float2]()
         var runCount = 0
         let radius = Float(10.0)
-        let step = (2.0 * Float.pi) / Float(slicesCount)
+        let step = (2 * Float.pi) / Float(slicesCount)
         var i = UInt16(0)
         while i <= parallelsCount {
             var j = UInt16(0)
-            while j <= slicesCount {
-                let vertex0 = radius * sinf(step * Float(i)) * cosf(step * Float(j))
+            while j <= slicesCount / 2 {
+                let vertex0 = radius * sinf(step * Float(i)) * cosf(step * Float(j) + Float.pi)
                 let vertex1 = radius * cosf(step * Float(i))
-                let vertex2 = radius * sinf(step * Float(i)) * sinf(step * Float(j))
+                let vertex2 = radius * sinf(step * Float(i)) * sinf(step * Float(j) + Float.pi)
                 let vertex3 = Float(1.0)
-                let vertex4 = Float(j) / Float(slicesCount) * 2.0 - 1.0
+                let vertex4 = Float(j) / Float(slicesCount / 2)
                 let vertex5 = Float(i) / Float(parallelsCount)
                 positions.append([vertex0, vertex1, vertex2, vertex3])
                 uvs.append([vertex4, vertex5])
-                if i < parallelsCount, j < slicesCount {
-                    indices[runCount] = i * (slicesCount + 1) + j
+                if i < parallelsCount, j < slicesCount / 2 {
+                    indices[runCount] = i * (slicesCount / 2 + 1) + j
                     runCount += 1
-                    indices[runCount] = UInt16((i + 1) * (slicesCount + 1) + j)
+                    indices[runCount] = UInt16((i + 1) * (slicesCount / 2 + 1) + j)
                     runCount += 1
-                    indices[runCount] = UInt16((i + 1) * (slicesCount + 1) + (j + 1))
+                    indices[runCount] = UInt16((i + 1) * (slicesCount / 2 + 1) + (j + 1))
                     runCount += 1
-                    indices[runCount] = UInt16(i * (slicesCount + 1) + j)
+                    indices[runCount] = UInt16(i * (slicesCount / 2 + 1) + j)
                     runCount += 1
-                    indices[runCount] = UInt16((i + 1) * (slicesCount + 1) + (j + 1))
+                    indices[runCount] = UInt16((i + 1) * (slicesCount / 2 + 1) + (j + 1))
                     runCount += 1
-                    indices[runCount] = UInt16(i * (slicesCount + 1) + (j + 1))
+                    indices[runCount] = UInt16(i * (slicesCount / 2 + 1) + (j + 1))
                     runCount += 1
                 }
                 j += 1

@@ -45,11 +45,15 @@ inline half4 gammaToLinear(half4 col) {
 
 vertex VertexOut mapTexture(VertexIn input [[stage_in]],
                             ushort ampId [[ amplification_id ]],
-                            constant CustomData & customData [[ buffer(3) ]]) {
+                            constant float4x4& scale [[ buffer(2) ]],
+                            constant CustomData & customData [[ buffer(3) ]],
+                            constant UniformsArray & uniformsArray [[ buffer(9) ]]) {
     VertexOut outVertex;
+    Uniforms uniforms = uniformsArray.uniforms[ampId];
+    
+    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * scale * input.pos;
     float2 texCoord = input.uv;
     
-    outVertex.renderedCoordinate = input.pos;
     if (customData.stereoMode == 1) {
         if (ampId == 0) {
             texCoord.x = texCoord.x * 0.5 + 0.5;

@@ -13,21 +13,21 @@ import UIKit
 #endif
 
 extension DisplayEnum {
-    private static var planeDisplay = PlaneDisplayModel()
+    private static var planeDisplay = VRPlaneDisplayModel()
     private static var vrDiaplay = VRDisplayModel()
     private static var vrBoxDiaplay = VRBoxDisplayModel()
     private static var vrDomeDisplay = VRDomeDisplayModel()
 
-    func set(encoder: MTLRenderCommandEncoder) {
+    func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
         switch self {
         case .plane:
-            DisplayEnum.planeDisplay.set(encoder: encoder)
+            DisplayEnum.planeDisplay.set(encoder: encoder, size: size)
         case .vr:
-            DisplayEnum.vrDiaplay.set(encoder: encoder)
+            DisplayEnum.vrDiaplay.set(encoder: encoder, size: size)
         case .vrBox:
-            DisplayEnum.vrBoxDiaplay.set(encoder: encoder)
+            DisplayEnum.vrBoxDiaplay.set(encoder: encoder, size: size)
         case .vrDome:
-            DisplayEnum.vrDomeDisplay.set(encoder: encoder)
+            DisplayEnum.vrDomeDisplay.set(encoder: encoder, size: size)
         }
     }
 
@@ -57,23 +57,25 @@ private class PlaneDisplayModel {
     let indexBuffer: MTLBuffer
     let posBuffer: MTLBuffer?
     let uvBuffer: MTLBuffer?
+    fileprivate var modelViewMatrix = matrix_identity_float4x4
 
     fileprivate init() {
-        let (indices, positions, uvs) = PlaneDisplayModel.genSphere()
+        let (indices, positions, uvs) = PlaneDisplayModel.genPlane()
         let device = MetalRender.device
         indexCount = indices.count
         indexBuffer = device.makeBuffer(bytes: indices, length: MemoryLayout<UInt16>.size * indexCount)!
         posBuffer = device.makeBuffer(bytes: positions, length: MemoryLayout<simd_float4>.size * positions.count)
         uvBuffer = device.makeBuffer(bytes: uvs, length: MemoryLayout<simd_float2>.size * uvs.count)
     }
+    
 
-    private static func genSphere() -> ([UInt16], [simd_float4], [simd_float2]) {
+    private static func genPlane() -> ([UInt16], [simd_float4], [simd_float2]) {
         let indices: [UInt16] = [0, 1, 2, 3]
         let positions: [simd_float4] = [
-            [-1.0, -1.0, 0.0, 1.0],
-            [-1.0, 1.0, 0.0, 1.0],
-            [1.0, -1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0, 1.0],
+            [-2.0, -1.0, -5.0, 1.0],
+            [-2.0, 3.0, -5.0, 1.0],
+            [2.0, -1.0, -5.0, 1.0],
+            [2.0, 3.0, -5.0, 1.0],
         ]
         let uvs: [simd_float2] = [
             [0.0, 1.0],
@@ -84,11 +86,11 @@ private class PlaneDisplayModel {
         return (indices, positions, uvs)
     }
 
-    func set(encoder: MTLRenderCommandEncoder) {
+    func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
         encoder.setFrontFacing(.clockwise)
         encoder.setVertexBuffer(posBuffer, offset: 0, index: 0)
         encoder.setVertexBuffer(uvBuffer, offset: 0, index: 1)
-        encoder.drawIndexedPrimitives(type: primitiveType, indexCount: indexCount, indexType: indexType, indexBuffer: indexBuffer, indexBufferOffset: 0)
+        //encoder.drawIndexedPrimitives(type: primitiveType, indexCount: indexCount, indexType: indexType, indexBuffer: indexBuffer, indexBufferOffset: 0)
     }
 
     func pipeline(planeCount: Int, bitDepth: Int32) -> MTLRenderPipelineState {
@@ -137,7 +139,7 @@ private class SphereDisplayModel {
         uvBuffer = device.makeBuffer(bytes: uvs, length: MemoryLayout<simd_float2>.size * uvs.count)
     }
 
-    func set(encoder: MTLRenderCommandEncoder) {
+    func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
         encoder.setFrontFacing(.clockwise)
         encoder.setVertexBuffer(posBuffer, offset: 0, index: 0)
         encoder.setVertexBuffer(uvBuffer, offset: 0, index: 1)
@@ -238,7 +240,7 @@ private class DomeDisplayModel {
         uvBuffer = device.makeBuffer(bytes: uvs, length: MemoryLayout<simd_float2>.size * uvs.count)
     }
 
-    func set(encoder: MTLRenderCommandEncoder) {
+    func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
         encoder.setFrontFacing(.clockwise)
         encoder.setVertexBuffer(posBuffer, offset: 0, index: 0)
         encoder.setVertexBuffer(uvBuffer, offset: 0, index: 1)
@@ -315,6 +317,27 @@ private class DomeDisplayModel {
     }
 }
 
+private class VRPlaneDisplayModel: PlaneDisplayModel {
+    private let modelViewProjectionMatrix: simd_float4x4
+    override required init() {
+        let size = MoonOptions.sceneSize
+        let aspect = Float(size.width / size.height)
+        let projectionMatrix = simd_float4x4(perspective: Float.pi / 3, aspect: aspect, nearZ: 0.1, farZ: 400.0)
+        let viewMatrix = simd_float4x4(lookAt: SIMD3<Float>.zero, center: [0, 0, -1000], up: [0, 1, 0])
+        modelViewProjectionMatrix = projectionMatrix * viewMatrix
+        super.init()
+    }
+
+    override func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
+        super.set(encoder: encoder, size: size)
+        let aspect = size.width / size.width
+        var matrix = simd_float4x4(scale: Float(aspect), y: 1, z: 1)
+        let matrixBuffer = MetalRender.device.makeBuffer(bytes: &matrix, length: MemoryLayout<simd_float4x4>.size)
+        encoder.setVertexBuffer(matrixBuffer, offset: 0, index: 2)
+        encoder.drawIndexedPrimitives(type: primitiveType, indexCount: indexCount, indexType: indexType, indexBuffer: indexBuffer, indexBufferOffset: 0)
+    }
+}
+
 private class VRDisplayModel: SphereDisplayModel {
     private let modelViewProjectionMatrix: simd_float4x4
     override required init() {
@@ -326,8 +349,8 @@ private class VRDisplayModel: SphereDisplayModel {
         super.init()
     }
 
-    override func set(encoder: MTLRenderCommandEncoder) {
-        super.set(encoder: encoder)
+    override func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
+        super.set(encoder: encoder, size: size)
         var matrix = modelViewProjectionMatrix * modelViewMatrix
         let matrixBuffer = MetalRender.device.makeBuffer(bytes: &matrix, length: MemoryLayout<simd_float4x4>.size)
         encoder.setVertexBuffer(matrixBuffer, offset: 0, index: 2)
@@ -346,8 +369,8 @@ private class VRDomeDisplayModel: DomeDisplayModel {
         super.init()
     }
 
-    override func set(encoder: MTLRenderCommandEncoder) {
-        super.set(encoder: encoder)
+    override func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
+        super.set(encoder: encoder, size: size)
         var matrix = modelViewProjectionMatrix * modelViewMatrix
         let matrixBuffer = MetalRender.device.makeBuffer(bytes: &matrix, length: MemoryLayout<simd_float4x4>.size)
         encoder.setVertexBuffer(matrixBuffer, offset: 0, index: 2)
@@ -369,8 +392,8 @@ private class VRBoxDisplayModel: SphereDisplayModel {
         super.init()
     }
 
-    override func set(encoder: MTLRenderCommandEncoder) {
-        super.set(encoder: encoder)
+    override func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
+        super.set(encoder: encoder, size: size)
         let layerSize = MoonOptions.sceneSize
         let width = Double(layerSize.width / 2)
         [(modelViewProjectionMatrixLeft, MTLViewport(originX: 0, originY: 0, width: width, height: Double(layerSize.height), znear: 0, zfar: 0)),

@@ -371,6 +371,7 @@ class MetalView: UIView {
 
     func draw(pixelBuffer: PixelBufferProtocol, display: DisplayEnum, size: CGSize) {
         metalLayer.drawableSize = size
+        
         let colorPixelFormat = MoonOptions.colorPixelFormat(bitDepth: pixelBuffer.bitDepth)
         metalLayer.pixelFormat = colorPixelFormat
         options?.pixelFormat = colorPixelFormat
@@ -397,10 +398,10 @@ class MetalView: UIView {
             UILog("[video] CAMetalLayer not readyForMoreMediaData")
             return
         }
-        if options?.display == .plane {
-            render.drawPlane(pixelBuffer: pixelBuffer, display: display, drawable: drawable)
+        if options?.display == .plane && options?.stereo == .mono {
+            render.drawPlane(pixelBuffer: pixelBuffer, display: display, drawable: drawable, size: size)
         } else {
-            render.drawImmersive(pixelBuffer: pixelBuffer, display: display)
+            render.drawImmersive(pixelBuffer: pixelBuffer, display: display, size: size)
         }
     }
 }

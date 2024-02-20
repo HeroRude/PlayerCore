@@ -133,7 +133,7 @@ class MetalRender {
         let depthStateDescriptor = MTLDepthStencilDescriptor()
         depthStateDescriptor.depthCompareFunction = MTLCompareFunction.greater
         depthStateDescriptor.isDepthWriteEnabled = true
-        self.depthState = MetalRender.device.makeDepthStencilState(descriptor:depthStateDescriptor)!
+        self.depthState = MetalRender.device.makeDepthStencilState(descriptor: depthStateDescriptor)!
         
         Task {
             do {
@@ -160,7 +160,7 @@ class MetalRender {
         commandBuffer.waitUntilCompleted()
     }
 
-    func drawPlane(pixelBuffer: PixelBufferProtocol, display: DisplayEnum = .plane, drawable: CAMetalDrawable) {
+    func drawPlane(pixelBuffer: PixelBufferProtocol, display: DisplayEnum = .plane, drawable: CAMetalDrawable, size: CGSize) {
         let inputTextures = pixelBuffer.textures()
         lastPassDescriptor = planePassDescriptor
         planePassDescriptor.colorAttachments[0].texture = drawable.texture
@@ -184,8 +184,8 @@ class MetalRender {
             texture.label = "texture\(index)"
             encoder.setFragmentTexture(texture, index: index)
         }
-        setFragmentBuffer(pixelBuffer: pixelBuffer, encoder: encoder)
-        display.set(encoder: encoder)
+        setBuffer(pixelBuffer: pixelBuffer, encoder: encoder)
+        display.set(encoder: encoder, size: size)
         encoder.popDebugGroup()
         encoder.endEncoding()
         commandBuffer.present(drawable)
@@ -193,7 +193,7 @@ class MetalRender {
         commandBuffer.waitUntilCompleted()
     }
     
-    func drawImmersive(pixelBuffer: PixelBufferProtocol, display: DisplayEnum = .plane) {
+    func drawImmersive(pixelBuffer: PixelBufferProtocol, display: DisplayEnum = .plane, size: CGSize) {
         guard let layerRenderer = MetalRender.options?.layerRenderer else {
             return
         }
@@ -270,8 +270,9 @@ class MetalRender {
             texture.label = "texture\(index)"
             encoder.setFragmentTexture(texture, index: index)
         }
-        setFragmentBuffer(pixelBuffer: pixelBuffer, encoder: encoder)
-        display.set(encoder: encoder)
+        setBuffer(pixelBuffer: pixelBuffer, encoder: encoder)
+        
+        display.set(encoder: encoder, size: size)
         encoder.popDebugGroup()
         encoder.endEncoding()
         drawable.encodePresent(commandBuffer: commandBuffer)
@@ -288,7 +289,7 @@ class MetalRender {
         bufferPointer!.copyMemory(from: &MetalRender.customBuffer, byteCount: MemoryLayout<CustomData>.size)
     }
 
-    private func setFragmentBuffer(pixelBuffer: PixelBufferProtocol, encoder: MTLRenderCommandEncoder) {
+    private func setBuffer(pixelBuffer: PixelBufferProtocol, encoder: MTLRenderCommandEncoder) {
         if pixelBuffer.planeCount > 1 {
             let buffer: MTLBuffer?
             let yCbCrMatrix = pixelBuffer.yCbCrMatrix
@@ -308,11 +309,14 @@ class MetalRender {
             let leftShift = pixelBuffer.leftShift == 0 ? leftShiftMatrixBuffer : leftShiftSixMatrixBuffer
             encoder.setFragmentBuffer(leftShift, offset: 0, index: 2)
             
-            // Custom data
-            updateCustomDataBuffer()
-            encoder.setVertexBuffer(customDataBuffer, offset: 0, index: 3)
-            encoder.setFragmentBuffer(customDataBuffer, offset: 0, index: 3)
         }
+        
+        // Custom data
+        updateCustomDataBuffer()
+        encoder.setVertexBuffer(customDataBuffer, offset: 0, index: 3)
+        encoder.setFragmentBuffer(customDataBuffer, offset: 0, index: 3)
+        
+        // Size
     }
     
     private func updateDynamicBufferState() {
@@ -370,11 +374,18 @@ class MetalRender {
         descriptor.vertexFunction = library.makeFunction(name: isSphere ? "mapSphereTexture" : "mapTexture")
         descriptor.fragmentFunction = library.makeFunction(name: fragmentFunction)
         
-        if isSphere {
-            if let layerRenderer = MetalRender.options?.layerRenderer {
-                descriptor.depthAttachmentPixelFormat = layerRenderer.configuration.depthFormat
-                descriptor.maxVertexAmplificationCount = layerRenderer.properties.viewCount
-            }
+//        if isSphere {
+//            if let layerRenderer = MetalRender.options?.layerRenderer {
+//                descriptor.depthAttachmentPixelFormat = layerRenderer.configuration.depthFormat
+//                descriptor.maxVertexAmplificationCount = layerRenderer.properties.viewCount
+//            }
+//        } else {
+//            descriptor.depthAttachmentPixelFormat = .invalid
+//            descriptor.maxVertexAmplificationCount = MetalRender.device.supportsVertexAmplificationCount(2) ? 2 : 1
+//        }
+        if let layerRenderer = MetalRender.options?.layerRenderer {
+            descriptor.depthAttachmentPixelFormat = layerRenderer.configuration.depthFormat
+            descriptor.maxVertexAmplificationCount = layerRenderer.properties.viewCount
         } else {
             descriptor.depthAttachmentPixelFormat = .invalid
             descriptor.maxVertexAmplificationCount = MetalRender.device.supportsVertexAmplificationCount(2) ? 2 : 1

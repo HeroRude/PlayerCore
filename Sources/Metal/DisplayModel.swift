@@ -330,8 +330,8 @@ private class VRPlaneDisplayModel: PlaneDisplayModel {
 
     override func set(encoder: MTLRenderCommandEncoder, size: CGSize) {
         super.set(encoder: encoder, size: size)
-        let aspect = size.width / size.width
-        var matrix = simd_float4x4(scale: Float(aspect), y: 1, z: 1)
+        let aspect = Float(size.width) / Float(size.height)
+        var matrix = simd_float4x4(scale: aspect, y: 1, z: 1)
         let matrixBuffer = MetalRender.device.makeBuffer(bytes: &matrix, length: MemoryLayout<simd_float4x4>.size)
         encoder.setVertexBuffer(matrixBuffer, offset: 0, index: 2)
         encoder.drawIndexedPrimitives(type: primitiveType, indexCount: indexCount, indexType: indexType, indexBuffer: indexBuffer, indexBufferOffset: 0)

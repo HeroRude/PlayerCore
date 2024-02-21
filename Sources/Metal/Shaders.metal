@@ -56,9 +56,9 @@ vertex VertexOut mapTexture(VertexIn input [[stage_in]],
     
     if (customData.stereoMode == 1) {
         if (ampId == 0) {
-            texCoord.x = texCoord.x * 0.5 + 0.5;
-        } else {
             texCoord.x = texCoord.x * 0.5;
+        } else {
+            texCoord.x = texCoord.x * 0.5 + 0.5;
         }
     } else if (customData.stereoMode == 2) {
         if (ampId == 0) {

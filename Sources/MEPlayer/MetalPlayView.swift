@@ -231,17 +231,20 @@ extension MetalPlayView {
 
     private func draw(force: Bool) {
         autoreleasepool {
-//            guard let frame = renderSource?.getVideoOutputRender(force: force) else {
-//                return
-//            }
-            let output = renderSource?.getVideoOutputRender(force: force)
-            if output == nil {
-                if pixelBuffer != nil && !options.isUseDisplayLayer() {
-                    metalView.draw(pixelBuffer: pixelBuffer!, display: options.display, size: lastSize)
-                }
+            guard let frame = renderSource?.getVideoOutputRender(force: force) else {
+                idle()
                 return
             }
-            let frame = output!
+//            let output = renderSource?.getVideoOutputRender(force: force)
+//            if output == nil {
+//                if pixelBuffer != nil {
+//                    if !options.isUseDisplayLayer() {
+//                        metalView.draw(pixelBuffer: pixelBuffer!, display: options.display, size: lastSize)
+//                    }
+//                }
+//                return
+//            }
+//            let frame = output!
             pixelBuffer = frame.corePixelBuffer
             guard let pixelBuffer else {
                 return

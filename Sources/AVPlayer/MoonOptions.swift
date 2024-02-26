@@ -636,14 +636,13 @@ public extension Array {
 
 public struct KSClock {
     public private(set) var lastMediaTime = CACurrentMediaTime()
-    public internal(set) var position = Int64(0)
-    public internal(set) var time = CMTime.zero {
+    public internal(set) var positionTime = CMTime.zero {
         didSet {
             lastMediaTime = CACurrentMediaTime()
         }
     }
 
     func getTime() -> TimeInterval {
-        time.seconds + CACurrentMediaTime() - lastMediaTime
+        positionTime.seconds + CACurrentMediaTime() - lastMediaTime
     }
 }

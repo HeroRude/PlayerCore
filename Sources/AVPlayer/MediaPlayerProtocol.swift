@@ -51,12 +51,6 @@ public class DynamicInfo: ObservableObject {
     }
 }
 
-public struct Chapter {
-    public let start: TimeInterval
-    public let end: TimeInterval
-    public let title: String
-}
-
 public protocol MediaPlayerProtocol: MediaPlayback {
     var delegate: MediaPlayerDelegate? { get set }
     var view: UIView? { get }
@@ -109,9 +103,9 @@ public protocol MediaPlayerDelegate: AnyObject {
 public protocol MediaPlayerTrack: AnyObject, CustomStringConvertible {
     var trackID: Int32 { get }
     var name: String { get }
-    var languageCode: String? { get }
+    var language: String? { get }
     var mediaType: AVFoundation.AVMediaType { get }
-    var nominalFrameRate: Float { get set }
+    var nominalFrameRate: Float { get }
     var bitRate: Int64 { get }
     var isEnabled: Bool { get set }
     var isImageSubtitle: Bool { get }
@@ -180,12 +174,6 @@ extension FFmpegFieldOrder: CustomStringConvertible {
 
 // swiftlint:enable identifier_name
 public extension MediaPlayerTrack {
-    var language: String? {
-        languageCode.flatMap {
-            Locale.current.localizedString(forLanguageCode: $0)
-        }
-    }
-
     var codecType: FourCharCode {
         mediaSubType.rawValue
     }

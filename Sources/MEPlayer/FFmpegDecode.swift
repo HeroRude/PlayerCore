@@ -16,10 +16,8 @@ class FFmpegDecode: DecodeProtocol {
     private var bestEffortTimestamp = Int64(0)
     private let frameChange: FrameChange
     private let filter: MEFilter
-    private let seekByBytes: Bool
     required init(assetTrack: FFmpegAssetTrack, options: MoonOptions) {
         self.options = options
-        seekByBytes = assetTrack.seekByBytes
         do {
             codecContext = try assetTrack.createContext(options: options)
         } catch {
@@ -61,6 +59,7 @@ class FFmpegDecode: DecodeProtocol {
                        let subtitle = closedCaptionsTrack.subtitle
                     {
                         let closedCaptionsPacket = Packet()
+                        closedCaptionsPacket.assetTrack = closedCaptionsTrack
                         if let corePacket = packet.corePacket {
                             closedCaptionsPacket.corePacket?.pointee.pts = corePacket.pointee.pts
                             closedCaptionsPacket.corePacket?.pointee.dts = corePacket.pointee.dts
@@ -73,7 +72,7 @@ class FFmpegDecode: DecodeProtocol {
                         let buffer = av_buffer_ref(sideData.pointee.buf)
                         closedCaptionsPacket.corePacket?.pointee.data = buffer?.pointee.data
                         closedCaptionsPacket.corePacket?.pointee.buf = buffer
-                        closedCaptionsPacket.assetTrack = closedCaptionsTrack
+                        closedCaptionsPacket.fill()
                         subtitle.putPacket(packet: closedCaptionsPacket)
                     }
                     if let sideData = av_frame_get_side_data(avframe, AV_FRAME_DATA_SEI_UNREGISTERED) {
@@ -87,29 +86,27 @@ class FFmpegDecode: DecodeProtocol {
                 filter.filter(options: options, inputFrame: avframe) { avframe in
                     do {
                         var frame = try frameChange.change(avframe: avframe)
-                        if let videoFrame = frame as? VideoVTBFrame, let pixelBuffer = videoFrame.corePixelBuffer as? PixelBuffer {
-                            pixelBuffer.formatDescription = packet.assetTrack.formatDescription
-                        }
                         frame.timebase = filter.timebase
                         //                frame.timebase = Timebase(avframe.pointee.time_base)
-                        frame.size = packet.size
-                        frame.position = packet.position
+                        frame.size = avframe.pointee.pkt_size
                         frame.duration = avframe.pointee.duration
                         if frame.duration == 0, avframe.pointee.sample_rate != 0, frame.timebase.num != 0 {
                             frame.duration = Int64(avframe.pointee.nb_samples) * Int64(frame.timebase.den) / (Int64(avframe.pointee.sample_rate) * Int64(frame.timebase.num))
                         }
-                        var timestamp = avframe.pointee.best_effort_timestamp
-                        if timestamp < 0 {
-                            timestamp = avframe.pointee.pts
+
+                        var position = avframe.pointee.best_effort_timestamp
+                        if position < 0 {
+                            position = avframe.pointee.pts
                         }
-                        if timestamp < 0 {
-                            timestamp = avframe.pointee.pkt_dts
+                        if position < 0 {
+                            position = avframe.pointee.pkt_dts
                         }
-                        if timestamp < 0 {
-                            timestamp = bestEffortTimestamp
+                        if position < 0 {
+                            position = bestEffortTimestamp
                         }
-                        frame.timestamp = timestamp
-                        bestEffortTimestamp = timestamp + frame.duration
+                        frame.position = position
+                        bestEffortTimestamp = position
+                        bestEffortTimestamp += frame.duration
                         completionHandler(.success(frame))
                     } catch {
                         completionHandler(.failure(error))
@@ -132,9 +129,6 @@ class FFmpegDecode: DecodeProtocol {
 
     func doFlushCodec() {
         bestEffortTimestamp = Int64(0)
-        if seekByBytes {
-            avcodec_flush_buffers(codecContext)
-        }
     }
 
     func shutdown() {

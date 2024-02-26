@@ -514,12 +514,12 @@ class AVMediaPlayerTrack: MediaPlayerTrack {
     let formatDescription: CMFormatDescription?
     let description: String
     private let track: AVPlayerItemTrack
-    var nominalFrameRate: Float
+    let nominalFrameRate: Float
     let trackID: Int32
     let rotation: Int16 = 0
     let bitRate: Int64
     let name: String
-    let languageCode: String?
+    let language: String?
     let mediaType: AVFoundation.AVMediaType
     let isImageSubtitle = false
     var dovi: DOVIDecoderConfigurationRecord?
@@ -538,21 +538,21 @@ class AVMediaPlayerTrack: MediaPlayerTrack {
         self.track = track
         trackID = track.assetTrack?.trackID ?? 0
         mediaType = track.assetTrack?.mediaType ?? .video
+        #if os(xrOS)
         name = track.assetTrack?.languageCode ?? ""
-        languageCode = track.assetTrack?.languageCode
+        language = track.assetTrack?.extendedLanguageTag
         nominalFrameRate = track.assetTrack?.nominalFrameRate ?? 24.0
         bitRate = Int64(track.assetTrack?.estimatedDataRate ?? 0)
-        #if os(xrOS)
         isPlayable = false
         #else
+        name = track.assetTrack?.languageCode ?? ""
+        language = track.assetTrack?.extendedLanguageTag
+        nominalFrameRate = track.assetTrack?.nominalFrameRate ?? 24.0
+        bitRate = Int64(track.assetTrack?.estimatedDataRate ?? 0)
         isPlayable = track.assetTrack?.isPlayable ?? false
         #endif
         // swiftlint:disable force_cast
-        if let first = track.assetTrack?.formatDescriptions.first {
-            formatDescription = first as! CMFormatDescription
-        } else {
-            formatDescription = nil
-        }
+        formatDescription = (track.assetTrack?.formatDescriptions.first as! CMFormatDescription)
         // swiftlint:enable force_cast
         description = (formatDescription?.mediaSubType ?? .boxed).rawValue.string
         #if os(xrOS)
@@ -564,7 +564,6 @@ class AVMediaPlayerTrack: MediaPlayerTrack {
 
     func load() {}
 }
-
 
 public extension AVAsset {
     func ceateImageGenerator() -> AVAssetImageGenerator {

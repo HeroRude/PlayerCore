@@ -41,9 +41,8 @@ final class MEPlayerItem {
     private var videoDisplayCount = UInt8(0)
     private var seekByBytes = false
     private var lastVideoDisplayTime = CACurrentMediaTime()
-    public private(set) var chapters: [Chapter] = []
     var currentPlaybackTime: TimeInterval {
-        state == .seeking ? seekTime : (mainClock().time - startTime).seconds
+        state == .seeking ? seekTime : (mainClock().positionTime - startTime).seconds
     }
 
     private var seekTime = TimeInterval(0)
@@ -82,7 +81,6 @@ final class MEPlayerItem {
     }
 
     lazy var dynamicInfo = DynamicInfo { [weak self] in
-        // metadata可能会实时变化。所以把它放在DynamicInfo里面
         toDictionary(self?.formatCtx?.pointee.metadata)
     } bytesRead: { [weak self] in
         self?.formatCtx?.pointee.pb?.pointee.bytes_read ?? 0
@@ -111,7 +109,7 @@ final class MEPlayerItem {
                         let playerItem = Unmanaged<MEPlayerItem>.fromOpaque(opaque).takeUnretainedValue()
                         playerItem.options.urlIO(log: String(log))
                         if log.starts(with: "Will reconnect at") {
-                            let seconds = playerItem.mainClock().time.seconds
+                            let seconds = playerItem.mainClock().positionTime.seconds
                             playerItem.videoTrack?.seekTime = seconds
                             playerItem.audioTrack?.seekTime = seconds
                         }
@@ -140,7 +138,7 @@ final class MEPlayerItem {
         operationQueue.name = "KSPlayer_" + String(describing: self).components(separatedBy: ".").last!
         operationQueue.maxConcurrentOperationCount = 1
         operationQueue.qualityOfService = .userInteractive
-        _ = MEPlayerItem.onceInitial
+//        _ = MEPlayerItem.onceInitial
         if let locale = options.audioLocale {
             audioRecognizer = AudioRecognizer(locale: locale) { text in
                 print(text)
@@ -254,28 +252,14 @@ extension MEPlayerItem {
         seekByBytes = (flags & AVFMT_NO_BYTE_SEEK == 0) && (flags & AVFMT_TS_DISCONT != 0) && options.formatName != "ogg"
         if formatCtx.pointee.start_time != Int64.min {
             startTime = CMTime(value: formatCtx.pointee.start_time, timescale: AV_TIME_BASE)
-            videoClock.time = startTime
-            audioClock.time = startTime
+            videoClock.positionTime = startTime
+            audioClock.positionTime = startTime
         }
         duration = TimeInterval(max(formatCtx.pointee.duration, 0) / Int64(AV_TIME_BASE))
         fileSize = Double(formatCtx.pointee.bit_rate) * duration / 8
         createCodec(formatCtx: formatCtx)
-        if formatCtx.pointee.nb_chapters > 0 {
-            chapters.removeAll()
-            for i in 0 ..< formatCtx.pointee.nb_chapters {
-                if let chapter = formatCtx.pointee.chapters[Int(i)]?.pointee {
-                    let timeBase = Timebase(chapter.time_base)
-                    let start = timeBase.cmtime(for: chapter.start).seconds
-                    let end = timeBase.cmtime(for: chapter.end).seconds
-                    let metadata = toDictionary(chapter.metadata)
-                    let title = metadata["title"] ?? ""
-                    chapters.append(Chapter(start: start, end: end, title: title))
-                }
-            }
-        }
-
         if let outputURL = options.outputURL {
-            startRecord(url: outputURL)
+            openOutput(url: outputURL)
         }
         if videoTrack == nil, audioTrack == nil {
             state = .failed
@@ -285,8 +269,7 @@ extension MEPlayerItem {
         }
     }
 
-    func startRecord(url: URL) {
-        stopRecord()
+    private func openOutput(url: URL) {
         let filename = url.isFileURL ? url.path : url.absoluteString
         var ret = avformat_alloc_output_context2(&outputFormatCtx, nil, nil, filename)
         guard let outputFormatCtx, let formatCtx else {
@@ -297,21 +280,21 @@ extension MEPlayerItem {
         var audioIndex: Int?
         var videoIndex: Int?
         let formatName = outputFormatCtx.pointee.oformat.pointee.name.flatMap { String(cString: $0) }
-        for i in 0 ..< Int(formatCtx.pointee.nb_streams) {
+        (0 ..< Int(formatCtx.pointee.nb_streams)).forEach { i in
             if let inputStream = formatCtx.pointee.streams[i] {
                 let codecType = inputStream.pointee.codecpar.pointee.codec_type
                 if [AVMEDIA_TYPE_AUDIO, AVMEDIA_TYPE_VIDEO, AVMEDIA_TYPE_SUBTITLE].contains(codecType) {
                     if codecType == AVMEDIA_TYPE_AUDIO {
                         if let audioIndex {
                             streamMapping[i] = audioIndex
-                            continue
+                            return
                         } else {
                             audioIndex = index
                         }
                     } else if codecType == AVMEDIA_TYPE_VIDEO {
                         if let videoIndex {
                             streamMapping[i] = videoIndex
-                            continue
+                            return
                         } else {
                             videoIndex = index
                         }
@@ -358,7 +341,6 @@ extension MEPlayerItem {
                         assetTrack.subtitle = subtitle
                         allPlayerItemTracks.append(subtitle)
                     }
-                    assetTrack.seekByBytes = seekByBytes
                     return assetTrack
                 }
             }
@@ -420,7 +402,7 @@ extension MEPlayerItem {
         let index = av_find_best_stream(formatCtx, AVMEDIA_TYPE_AUDIO, wantedStreamNb, videoIndex, nil, 0)
         if let first = audios.first(where: {
             index > 0 ? $0.trackID == index : true
-        }), first.codecpar.codec_id != AV_CODEC_ID_NONE {
+        }) {
             first.isEnabled = true
             options.process(assetTrack: first)
             // 音频要比较所有的音轨，因为truehd的fps是1200，跟其他的音轨差距太大了
@@ -464,32 +446,22 @@ extension MEPlayerItem {
                 condition.wait()
             }
             if state == .seeking {
+                let positionTime = mainClock().positionTime
                 let seekToTime = seekTime
-                let time = mainClock().time
-                var increase = Int64(seekTime + startTime.seconds - time.seconds)
+                var increase = Int64(seekTime + startTime.seconds - positionTime.seconds)
                 var seekFlags = options.seekFlags
                 let timeStamp: Int64
                 if seekByBytes {
                     seekFlags |= AVSEEK_FLAG_BYTE
                     if let bitRate = formatCtx?.pointee.bit_rate {
-                        increase = increase * bitRate / 8
+                        increase *= (bitRate / 8)
                     } else {
                         increase *= 180_000
                     }
-                    var position = Int64(-1)
-                    if position < 0 {
-                        position = videoClock.position
-                    }
-                    if position < 0 {
-                        position = audioClock.position
-                    }
-                    if position < 0 {
-                        position = avio_tell(formatCtx?.pointee.pb)
-                    }
-                    timeStamp = position + increase
+                    timeStamp = positionTime.value + increase
                 } else {
                     increase *= Int64(AV_TIME_BASE)
-                    timeStamp = Int64(time.seconds) * Int64(AV_TIME_BASE) + increase
+                    timeStamp = Int64(positionTime.seconds) * Int64(AV_TIME_BASE) + increase
                 }
                 let seekMin = increase > 0 ? timeStamp - increase + 2 : Int64.min
                 let seekMax = increase < 0 ? timeStamp - increase - 2 : Int64.max
@@ -520,8 +492,8 @@ extension MEPlayerItem {
                     self.seekingCompletionHandler?(result >= 0)
                     self.seekingCompletionHandler = nil
                 }
-                audioClock.time = CMTime(seconds: seekToTime, preferredTimescale: time.timescale) + startTime
-                videoClock.time = CMTime(seconds: seekToTime, preferredTimescale: time.timescale) + startTime
+                audioClock.positionTime = CMTime(seconds: seekToTime, preferredTimescale: positionTime.timescale) + startTime
+                videoClock.positionTime = CMTime(seconds: seekToTime, preferredTimescale: positionTime.timescale) + startTime
                 state = .reading
             } else if state == .reading {
                 autoreleasepool {
@@ -561,6 +533,7 @@ extension MEPlayerItem {
             if corePacket.pointee.size <= 0 {
                 return 0
             }
+            packet.fill()
             let first = assetTracks.first { $0.trackID == corePacket.pointee.stream_index }
             if let first, first.isEnabled {
                 packet.assetTrack = first
@@ -642,7 +615,9 @@ extension MEPlayerItem: MediaPlayback {
         guard state != .closed else { return }
         state = .closed
         av_packet_free(&outputPacket)
-        stopRecord()
+        if let outputFormatCtx {
+            av_write_trailer(outputFormatCtx)
+        }
         // 故意循环引用。等结束了。才释放
         let closeOperation = BlockOperation {
             Thread.current.name = (self.operationQueue.name ?? "") + "_close"
@@ -673,12 +648,6 @@ extension MEPlayerItem: MediaPlayback {
             }
         }
         self.closeOperation = closeOperation
-    }
-
-    func stopRecord() {
-        if let outputFormatCtx {
-            av_write_trailer(outputFormatCtx)
-        }
     }
 
     func seek(time: TimeInterval, completion: @escaping ((Bool) -> Void)) {
@@ -779,22 +748,20 @@ extension MEPlayerItem: OutputRenderSourceDelegate {
         isAudioStalled ? videoClock : audioClock
     }
 
-    func setVideo(time: CMTime, position: Int64) {
-//        print("[video] video interval \(CACurrentMediaTime() - videoClock.lastMediaTime) video diff \(time.seconds - videoClock.time.seconds)")
-        videoClock.time = time
-        videoClock.position = position
+    func setVideo(time: CMTime) {
+        videoClock.positionTime = time
+        let time = CACurrentMediaTime()
         videoDisplayCount += 1
-        let diff = videoClock.lastMediaTime - lastVideoDisplayTime
+        let diff = time - lastVideoDisplayTime
         if diff > 1 {
             dynamicInfo.displayFPS = Double(videoDisplayCount) / diff
             videoDisplayCount = 0
-            lastVideoDisplayTime = videoClock.lastMediaTime
+            lastVideoDisplayTime = time
         }
     }
 
-    func setAudio(time: CMTime, position: Int64) {
-        audioClock.time = time
-        audioClock.position = position
+    func setAudio(time: CMTime) {
+        audioClock.positionTime = time
     }
 
     func getVideoOutputRender(force: Bool) -> VideoVTBFrame? {
@@ -823,7 +790,7 @@ extension MEPlayerItem: OutputRenderSourceDelegate {
             dynamicInfo.droppedVideoFrameCount += UInt32(count)
         case .seek:
             videoTrack.outputRenderQueue.flush()
-            videoTrack.seekTime = mainClock().time.seconds
+            videoTrack.seekTime = mainClock().positionTime.seconds
         case .dropNextPacket:
             if let videoTrack = videoTrack as? AsyncPlayerItemTrack {
                 let packet = videoTrack.packetQueue.pop { item, _ -> Bool in

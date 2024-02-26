@@ -15,7 +15,6 @@ import Spatial
 
 struct CustomData {
     public var stereoMode: Int = 0
-    public var frameCounter: UInt32 = 0
 }
 
 struct Uniforms {
@@ -283,7 +282,6 @@ class MetalRender {
     }
     
     func updateCustomDataBuffer() {
-        MetalRender.customBuffer.frameCounter &+= 1
         MetalRender.customBuffer.stereoMode = (MetalRender.options?.stereo.rawValue)!
         let bufferPointer = customDataBuffer?.contents()
         bufferPointer!.copyMemory(from: &MetalRender.customBuffer, byteCount: MemoryLayout<CustomData>.size)

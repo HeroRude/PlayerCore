@@ -144,6 +144,8 @@ public enum StereoEnum: Int {
     case mono = 0
     case leftRight = 1
     case topBottom = 2
+    case fullSbsLR = 3
+    case fullSbsTB = 4
 }
 
 public struct VideoAdaptationState {

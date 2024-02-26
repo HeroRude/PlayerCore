@@ -4,6 +4,20 @@
 #include <simd/simd.h>
 using namespace metal;
 
+constant float4x4 scaleLRMatrix = float4x4(
+    float4(0.5, 0.0, 0.0, 0.0),  // X轴缩放为0.5
+    float4(0.0, 1.0, 0.0, 0.0),  // Y轴不变
+    float4(0.0, 0.0, 1.0, 0.0),  // Z轴不变
+    float4(0.0, 0.0, 0.0, 1.0)   // 保持不变
+);
+
+constant float4x4 scaleTBMatrix = float4x4(
+    float4(1.0, 0.0, 0.0, 0.0),  // X轴不变
+    float4(0.0, 0.5, 0.0, 0.0),  // Y轴缩放0.5
+    float4(0.0, 0.0, 1.0, 0.0),  // Z轴不变
+    float4(0.0, 0.0, 0.0, 1.0)   // 保持不变
+);
+
 typedef struct {
     int stereoMode;
     uint frameCounter;
@@ -50,17 +64,24 @@ vertex VertexOut mapTexture(VertexIn input [[stage_in]],
                             constant UniformsArray & uniformsArray [[ buffer(9) ]]) {
     VertexOut outVertex;
     Uniforms uniforms = uniformsArray.uniforms[ampId];
+    float4x4 scaleFactor = scale;
     
-    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * scale * input.pos;
+    if (customData.stereoMode == 3) {
+        scaleFactor = scale * scaleLRMatrix;
+    } else if (customData.stereoMode == 4) {
+        scaleFactor = scale * scaleTBMatrix;
+    }
+    
+    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * scaleFactor * input.pos;
     float2 texCoord = input.uv;
     
-    if (customData.stereoMode == 1) {
+    if (customData.stereoMode == 1 || customData.stereoMode == 3) {
         if (ampId == 0) {
             texCoord.x = texCoord.x * 0.5;
         } else {
             texCoord.x = texCoord.x * 0.5 + 0.5;
         }
-    } else if (customData.stereoMode == 2) {
+    } else if (customData.stereoMode == 2 || customData.stereoMode == 4) {
         if (ampId == 0) {
             texCoord.y = texCoord.y * 0.5;
         } else {
@@ -81,13 +102,13 @@ vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]],
     outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * input.pos;
     float2 texCoord = input.uv;
     
-    if (customData.stereoMode == 1) {
+    if (customData.stereoMode == 1 || customData.stereoMode == 3) {
         if (ampId == 0) {
             texCoord.x = texCoord.x * 0.5;
         } else {
             texCoord.x = texCoord.x * 0.5 + 0.5;
         }
-    } else if (customData.stereoMode == 2) {
+    } else if (customData.stereoMode == 2 || customData.stereoMode == 4) {
         if (ampId == 0) {
             texCoord.y = texCoord.y * 0.5;
         } else {

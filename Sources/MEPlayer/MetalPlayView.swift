@@ -231,9 +231,16 @@ extension MetalPlayView {
 
     private func draw(force: Bool) {
         autoreleasepool {
-            guard let frame = renderSource?.getVideoOutputRender(force: force) else {
+            let output = renderSource?.getVideoOutputRender(force: force)
+            if output == nil {
+                if pixelBuffer != nil && !options.isUseDisplayLayer() {
+                    metalView.draw(pixelBuffer: pixelBuffer!, display: options.display, size: lastSize)
+                    return
+                }
                 return
             }
+            
+            let frame = output!
             pixelBuffer = frame.corePixelBuffer
             guard let pixelBuffer else {
                 return
@@ -264,16 +271,19 @@ extension MetalPlayView {
                 if options.display == .plane {
                     if let dar = options.customizeDar(sar: sar, par: par) {
                         size = CGSize(width: par.width, height: par.width * dar.height / dar.width)
+                        lastSize = size
                     } else {
                         size = CGSize(width: par.width, height: par.height * sar.height / sar.width)
+                        lastSize = size
                     }
                 } else {
                     size = MoonOptions.sceneSize
+                    lastSize = size
                 }
                 checkFormatDescription(pixelBuffer: pixelBuffer)
                 metalView.draw(pixelBuffer: pixelBuffer, display: options.display, size: size)
             }
-            renderSource?.setVideo(time: cmtime)
+            renderSource?.setVideo(time: cmtime, position: frame.position)
         }
     }
     

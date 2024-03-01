@@ -159,7 +159,7 @@ private class SphereDisplayModel {
         var positions = [simd_float4]()
         var uvs = [simd_float2]()
         var runCount = 0
-        let radius = Float(10.0)
+        let radius = Float(5.0)
         let step = (2.0 * Float.pi) / Float(slicesCount)
         var i = UInt16(0)
         while i <= parallelsCount {
@@ -260,7 +260,7 @@ private class DomeDisplayModel {
         var positions = [simd_float4]()
         var uvs = [simd_float2]()
         var runCount = 0
-        let radius = Float(10.0)
+        let radius = Float(5.0)
         let step = (2 * Float.pi) / Float(slicesCount)
         var i = UInt16(0)
         while i <= parallelsCount {

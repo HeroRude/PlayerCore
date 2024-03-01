@@ -5,9 +5,29 @@ import UIKit
 #endif
 import CompositorServices
 
+open class MoonPlaybackSettings {
+    public static let minScreenTilt: Double = -90.0
+    public static let maxScreenTilt: Double = 90.0
+    public static let minScreenHeight: Double = -4.0
+    public static let maxScreenHeight: Double = 4.0
+    public static let minScreenZoom: Double = -4.0
+    public static let maxScreenZoom: Double = 4.0
+    
+    // Screen
+    @Published public var screenTilt: Double = 0.0
+    @Published public var screenHeight: Double = 0.0
+    @Published public var screenZoom: Double = 0.0
+    
+    public init() {
+        
+    }
+}
+
 open class MoonOptions {
     public var layerRenderer: LayerRenderer?
-    public var pixelFormat: MTLPixelFormat = .bgra8Unorm
+    public var pixelFormat: MTLPixelFormat = .bgra8Unorm_srgb
+    
+    public var playbackSettings = MoonPlaybackSettings()
     
     public var isRoundRectangle = true
     public var cornerRadius: CGFloat = 40

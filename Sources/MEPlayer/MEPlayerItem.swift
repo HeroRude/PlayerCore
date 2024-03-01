@@ -178,7 +178,7 @@ extension MEPlayerItem {
     private func openThread() {
         avformat_close_input(&self.formatCtx)
         formatCtx = avformat_alloc_context()
-        if let protocolWhitelistCString = "file,crypto,data,http,https,tls,tcp".cString(using: .utf8) {
+        if let protocolWhitelistCString = "file,crypto,data,http,https,tls,tcp,httpproxy".cString(using: .utf8) {
             formatCtx?.pointee.protocol_whitelist = strdup(protocolWhitelistCString)
         }
         

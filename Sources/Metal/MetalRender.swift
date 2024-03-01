@@ -324,8 +324,13 @@ class MetalRender {
     }
     
     private func uniforms(drawable: LayerRenderer.Drawable, deviceAnchor: DeviceAnchor?, forViewIndex viewIndex: Int) -> Uniforms {
-        let modelTranslationMatrix = matrix4x4_translation(0.0, 0.0, 0.0)
-        let modelMatrix = modelTranslationMatrix
+        let translationMatrix = matrix4x4_translation(0,
+                                                      Float(MetalRender.options!.playbackSettings.screenHeight ?? 0), 
+                                                      Float(MetalRender.options!.playbackSettings
+                                                        .screenZoom ?? 0))
+        let rotationMatrix = simd_float4x4(rotationX: radians_from_degrees(Float(MetalRender.options!.playbackSettings.screenTilt ?? 0)))
+    
+        let modelMatrix = translationMatrix * rotationMatrix
         
         let simdDeviceAnchor = deviceAnchor?.originFromAnchorTransform ?? matrix_identity_float4x4
         let view = drawable.views[viewIndex]
@@ -338,7 +343,12 @@ class MetalRender {
                                                farZ: Double(drawable.depthRange.x),
                                                reverseZ: true)
         
-        return Uniforms(projectionMatrix: .init(projection), modelViewMatrix: viewMatrix * modelMatrix)
+
+        
+        var modelViewMatrix = viewMatrix * modelMatrix
+        
+        let uniforms = Uniforms(projectionMatrix: .init(projection), modelViewMatrix: modelViewMatrix)
+        return uniforms
     }
     
     // Generic matrix math utility functions

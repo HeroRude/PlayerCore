@@ -18,6 +18,8 @@ open class MoonPlaybackSettings {
     @Published public var screenHeight: Double = 0.0
     @Published public var screenZoom: Double = 0.0
     
+    @Published public var swapEyes: Bool = false
+    
     public init() {
         
     }

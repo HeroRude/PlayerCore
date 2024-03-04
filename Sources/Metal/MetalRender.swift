@@ -14,7 +14,8 @@ import CompositorServices
 import Spatial
 
 struct CustomData {
-    public var stereoMode: Int = 0
+    public var stereoMode: Int32 = 0
+    public var swapEyes: Int32 = 0
 }
 
 struct Uniforms {
@@ -282,7 +283,8 @@ class MetalRender {
     }
     
     func updateCustomDataBuffer() {
-        MetalRender.customBuffer.stereoMode = (MetalRender.options?.stereo.rawValue)!
+        MetalRender.customBuffer.stereoMode = Int32((MetalRender.options?.stereo.rawValue)!)
+        MetalRender.customBuffer.swapEyes = (MetalRender.options?.playbackSettings.swapEyes)! ? 1:0
         let bufferPointer = customDataBuffer?.contents()
         bufferPointer!.copyMemory(from: &MetalRender.customBuffer, byteCount: MemoryLayout<CustomData>.size)
     }

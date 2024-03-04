@@ -20,7 +20,7 @@ constant float4x4 scaleTBMatrix = float4x4(
 
 typedef struct {
     int stereoMode;
-    uint frameCounter;
+    int swapEyes;
 } CustomData;
 
 typedef struct
@@ -78,16 +78,29 @@ vertex VertexOut mapTexture(VertexIn input [[stage_in]],
     if (customData.stereoMode == 1 || customData.stereoMode == 3) {
         if (ampId == 0) {
             texCoord.x = texCoord.x * 0.5;
+            if (customData.swapEyes == 1) {
+                texCoord.x = texCoord.x + 0.5;
+            }
         } else {
             texCoord.x = texCoord.x * 0.5 + 0.5;
+            if (customData.swapEyes == 1) {
+                texCoord.x = texCoord.x - 0.5;
+            }
         }
     } else if (customData.stereoMode == 2 || customData.stereoMode == 4) {
         if (ampId == 0) {
             texCoord.y = texCoord.y * 0.5;
+            if (customData.swapEyes == 1) {
+                texCoord.y = texCoord.y + 0.5;
+            }
         } else {
             texCoord.y = texCoord.y * 0.5 + 0.5;
+            if (customData.swapEyes == 1) {
+                texCoord.y = texCoord.y - 0.5;
+            }
         }
     }
+    
     outVertex.textureCoordinate = texCoord;
     return outVertex;
 }
@@ -105,14 +118,26 @@ vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]],
     if (customData.stereoMode == 1 || customData.stereoMode == 3) {
         if (ampId == 0) {
             texCoord.x = texCoord.x * 0.5;
+            if (customData.swapEyes == 1) {
+                texCoord.x = texCoord.x + 0.5;
+            }
         } else {
             texCoord.x = texCoord.x * 0.5 + 0.5;
+            if (customData.swapEyes == 1) {
+                texCoord.x = texCoord.x - 0.5;
+            }
         }
     } else if (customData.stereoMode == 2 || customData.stereoMode == 4) {
         if (ampId == 0) {
             texCoord.y = texCoord.y * 0.5;
+            if (customData.swapEyes == 1) {
+                texCoord.y = texCoord.y + 0.5;
+            }
         } else {
             texCoord.y = texCoord.y * 0.5 + 0.5;
+            if (customData.swapEyes == 1) {
+                texCoord.y = texCoord.y - 0.5;
+            }
         }
     }
     outVertex.textureCoordinate = texCoord;

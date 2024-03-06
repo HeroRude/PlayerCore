@@ -543,6 +543,10 @@ public extension MoonOptions {
     #endif
 }
 
+public extension MoonOptions {
+    static var doubleTapHandler: () -> Void = {}
+}
+
 public enum LogLevel: Int32, CustomStringConvertible {
     case panic = 0
     case fatal = 8

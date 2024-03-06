@@ -18,6 +18,17 @@ struct CustomData {
     public var swapEyes: Int32 = 0
 }
 
+struct HandTrackingInfo {
+    public var lastTapTimestamp: TimeInterval = 0.0
+    
+    public var pinchStart: Bool = false
+    public var pinching: Bool = false
+    public var pinchEnd: Bool = false
+    
+    public var tapped: Bool = false
+    public var doubleTapped: Bool = false
+}
+
 struct Uniforms {
     var projectionMatrix: simd_float4x4
     var modelViewMatrix: simd_float4x4
@@ -52,6 +63,7 @@ class MetalRender {
     }()
 
     private let worldTracking: WorldTrackingProvider
+    private let handTracking: HandTrackingProvider
     private let arSession: ARKitSession
     private var lastPassDescriptor: MTLRenderPassDescriptor?
     private let immersivePassDescriptor = MTLRenderPassDescriptor()
@@ -61,6 +73,8 @@ class MetalRender {
     private var uniforms: UnsafeMutablePointer<UniformsArray>
     private var uniformBufferOffset = 0
     private var uniformBufferIndex = 0
+    private var rightHandInfo: HandTrackingInfo
+    private var leftHandInfo: HandTrackingInfo
     private let commandQueue = MetalRender.device.makeCommandQueue()
     private lazy var samplerState: MTLSamplerState? = {
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -121,7 +135,12 @@ class MetalRender {
 
     public init() {
         worldTracking = WorldTrackingProvider()
+        handTracking = HandTrackingProvider()
+
         arSession = ARKitSession()
+        
+        rightHandInfo = HandTrackingInfo()
+        leftHandInfo = HandTrackingInfo()
         
         // DynamicUniformBuffer
         let uniformBufferSize = alignedUniformsSize * maxBuffersInFlight
@@ -137,7 +156,11 @@ class MetalRender {
         
         Task {
             do {
-                try await arSession.run([worldTracking])
+                var providers: [DataProvider] = [worldTracking]
+                if HandTrackingProvider.isSupported {
+                    providers.append(handTracking)
+                }
+                try await arSession.run(providers)
             } catch {
                 fatalError("Failed to initialize ARSession")
             }
@@ -214,8 +237,12 @@ class MetalRender {
         
         let time = LayerRenderer.Clock.Instant.epoch.duration(to: drawable.frameTiming.presentationTime).timeInterval
         let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: time)
-        
         drawable.deviceAnchor = deviceAnchor
+        
+        let anchors = handTracking.latestAnchors
+        
+        updateHandTrackingInfo(anchors.leftHand, info: &leftHandInfo, atTimestamp: time)
+        updateHandTrackingInfo(anchors.rightHand, info: &rightHandInfo, atTimestamp: time)
     
         let inputTextures = pixelBuffer.textures()
         lastPassDescriptor = immersivePassDescriptor
@@ -323,6 +350,58 @@ class MetalRender {
         uniformBufferIndex = (uniformBufferIndex + 1) % maxBuffersInFlight
         uniformBufferOffset = alignedUniformsSize * uniformBufferIndex
         uniforms = UnsafeMutableRawPointer(dynamicUniformBuffer.contents() + uniformBufferOffset).bindMemory(to:UniformsArray.self, capacity:1)
+    }
+    
+    private func updateHandTrackingInfo(_ hand: HandAnchor?, info: inout HandTrackingInfo, atTimestamp: TimeInterval) {
+        guard let hand else {
+            return
+        }
+        
+        guard let skeleton = hand.handSkeleton else {
+            return
+        }
+        
+        let originFromThumbTipTransform = matrix_multiply(hand.originFromAnchorTransform, skeleton.joint(.thumbTip).anchorFromJointTransform).columns.3
+        
+        let originFromIndexTipTransform = matrix_multiply(hand.originFromAnchorTransform, skeleton.joint(.indexFingerTip).anchorFromJointTransform).columns.3
+        
+        let pinchDistance = distance(originFromIndexTipTransform, originFromThumbTipTransform)
+        
+        // When pinched
+        if pinchDistance < 0.02 {
+            if info.pinchStart {
+                info.pinchStart = false
+                info.pinching = true
+            } else if info.pinching {
+                // nothing here
+            } else {
+                info.pinchStart = true
+            }
+        } else {
+            if info.pinching {
+                info.pinchEnd = true
+            } else if info.pinchEnd {
+                info.pinchEnd = false
+                info.tapped = true
+                //
+                if atTimestamp - info.lastTapTimestamp < 1 {
+                    // double tapped
+                    info.doubleTapped = true
+                    info.lastTapTimestamp = 0
+                    MoonOptions.doubleTapHandler()
+                } else {
+                    // just tapped
+                    info.lastTapTimestamp = atTimestamp
+                }
+                
+                
+            } else if info.tapped {
+                info.tapped = false
+                info.doubleTapped = false
+            }
+            info.pinchStart = false
+            info.pinching = false
+        }
     }
     
     private func uniforms(drawable: LayerRenderer.Drawable, deviceAnchor: DeviceAnchor?, forViewIndex viewIndex: Int) -> Uniforms {

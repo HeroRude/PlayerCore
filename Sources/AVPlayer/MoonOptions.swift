@@ -544,7 +544,8 @@ public extension MoonOptions {
 }
 
 public extension MoonOptions {
-    static var doubleTapHandler: () -> Void = {}
+    static var singleMiddleTapHandler: () -> Void = {}
+    static var doubleMiddleTapHandler: () -> Void = {}
 }
 
 public enum LogLevel: Int32, CustomStringConvertible {

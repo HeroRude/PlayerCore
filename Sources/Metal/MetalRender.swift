@@ -363,12 +363,12 @@ class MetalRender {
         
         let originFromThumbTipTransform = matrix_multiply(hand.originFromAnchorTransform, skeleton.joint(.thumbTip).anchorFromJointTransform).columns.3
         
-        let originFromIndexTipTransform = matrix_multiply(hand.originFromAnchorTransform, skeleton.joint(.indexFingerTip).anchorFromJointTransform).columns.3
+        let originFromMiddleTipTransform = matrix_multiply(hand.originFromAnchorTransform, skeleton.joint(.middleFingerTip).anchorFromJointTransform).columns.3
         
-        let pinchDistance = distance(originFromIndexTipTransform, originFromThumbTipTransform)
+        let pinchDistance = distance(originFromMiddleTipTransform, originFromThumbTipTransform)
         
         // When pinched
-        if pinchDistance < 0.02 {
+        if pinchDistance <= 0.02 {
             if info.pinchStart {
                 info.pinchStart = false
                 info.pinching = true
@@ -380,25 +380,27 @@ class MetalRender {
         } else {
             if info.pinching {
                 info.pinchEnd = true
+                print("pinch end")
             } else if info.pinchEnd {
                 info.pinchEnd = false
-                info.tapped = true
+                //info.tapped = true
                 //
                 if atTimestamp - info.lastTapTimestamp < 1 {
                     // double tapped
-                    info.doubleTapped = true
+                    //info.doubleTapped = true
                     info.lastTapTimestamp = 0
-                    MoonOptions.doubleTapHandler()
+                    print("double tapped")
+                    MoonOptions.doubleMiddleTapHandler()
                 } else {
                     // just tapped
                     info.lastTapTimestamp = atTimestamp
+                    MoonOptions.singleMiddleTapHandler()
                 }
-                
-                
-            } else if info.tapped {
-                info.tapped = false
-                info.doubleTapped = false
-            }
+            } 
+//            else if info.tapped {
+//                info.tapped = false
+//                info.doubleTapped = false
+//            }
             info.pinchStart = false
             info.pinching = false
         }

@@ -368,7 +368,7 @@ class MetalRender {
         let pinchDistance = distance(originFromMiddleTipTransform, originFromThumbTipTransform)
         
         // When pinched
-        if pinchDistance <= 0.02 {
+        if pinchDistance <= 0.015 {
             if info.pinchStart {
                 info.pinchStart = false
                 info.pinching = true
@@ -385,7 +385,7 @@ class MetalRender {
                 info.pinchEnd = false
                 //info.tapped = true
                 //
-                if atTimestamp - info.lastTapTimestamp < 1 {
+                if atTimestamp - info.lastTapTimestamp < 0.6 {
                     // double tapped
                     //info.doubleTapped = true
                     info.lastTapTimestamp = 0

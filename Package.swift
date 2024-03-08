@@ -23,7 +23,17 @@ let package = Package(
 //                .product(name: "Libass", package: "FFmpegKit"),
 //                .product(name: "Libmpv", package: "FFmpegKit"),
             ],
-            resources: [.process("Metal/Shaders.metal")]
+            resources: [
+                .process("Metal/Shaders.metal"),
+                .process("Metal/Meshes/Plane.obj"),
+                .process("Metal/Meshes/Dome180.obj"),
+                .process("Metal/Meshes/Sphere360.obj"),
+                .process("Metal/Meshes/CubeH.obj"),
+                .process("Metal/Meshes/CubeV.obj"),
+                .process("Metal/Meshes/Fisheye180.obj"),
+                .process("Metal/Meshes/Fisheye190.obj"),
+                .process("Metal/Meshes/Fisheye200.obj")
+            ]
         )
     ]
 )

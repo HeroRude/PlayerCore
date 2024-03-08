@@ -20,6 +20,7 @@ constant float4x4 scaleTBMatrix = float4x4(
 
 typedef struct {
     int stereoMode;
+    int displayMode;
     int swapEyes;
 } CustomData;
 
@@ -36,7 +37,7 @@ typedef struct
 
 struct VertexIn
 {
-    float4 pos [[attribute(0)]];
+    float3 pos [[attribute(0)]];
     float2 uv [[attribute(1)]];
 };
 
@@ -72,7 +73,7 @@ vertex VertexOut mapTexture(VertexIn input [[stage_in]],
         scaleFactor = scale * scaleTBMatrix;
     }
     
-    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * scaleFactor * input.pos;
+    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * scaleFactor * float4(input.pos, 1.0);
     float2 texCoord = input.uv;
     
     if (customData.stereoMode == 1 || customData.stereoMode == 3) {
@@ -112,7 +113,7 @@ vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]],
     VertexOut outVertex;
     Uniforms uniforms = uniformsArray.uniforms[ampId];
     
-    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * input.pos;
+    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * float4(input.pos, 1.0);
     float2 texCoord = input.uv;
     
     if (customData.stereoMode == 1 || customData.stereoMode == 3) {
@@ -140,6 +141,7 @@ vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]],
             }
         }
     }
+    
     outVertex.textureCoordinate = texCoord;
     
     return outVertex;

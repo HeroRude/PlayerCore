@@ -134,10 +134,14 @@ public extension FourCharCode {
 public enum DisplayEnum: Int {
     case plane = 0
     // swiftlint:disable identifier_name
-    case vr = 1
+    case sphere = 1
     // swiftlint:enable identifier_name
-    case vrBox = 2
-    case vrDome = 3
+    case dome = 3
+    case fisheye180 = 4
+    case fisheye190 = 5
+    case fisheye200 = 6
+    case cubeH = 7
+    case cubeV = 8
 }
 
 public enum StereoEnum: Int {

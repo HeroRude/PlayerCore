@@ -1,0 +1,14 @@
+# Apple ModelIO OBJ File: Plane
+mtllib Plane.mtl
+g 
+v -2 -2 -5
+v -2 2 -5
+v 2 2 -5
+v 2 -2 -5
+vt 0 1
+vt 0 0
+vt 1 0
+vt 1 1
+usemtl material_1
+f 1/1 2/2 3/3 4/4 
+s off

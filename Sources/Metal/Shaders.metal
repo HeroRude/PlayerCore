@@ -20,7 +20,6 @@ constant float4x4 scaleTBMatrix = float4x4(
 
 typedef struct {
     int stereoMode;
-    int displayMode;
     int swapEyes;
 } CustomData;
 

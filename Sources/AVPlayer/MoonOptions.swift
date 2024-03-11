@@ -8,10 +8,10 @@ import CompositorServices
 open class MoonPlaybackSettings {
     public static let minScreenTilt: Double = -90.0
     public static let maxScreenTilt: Double = 90.0
-    public static let minScreenHeight: Double = -4.0
-    public static let maxScreenHeight: Double = 4.0
-    public static let minScreenZoom: Double = -4.0
-    public static let maxScreenZoom: Double = 4.0
+    public static let minScreenHeight: Double = -99.0
+    public static let maxScreenHeight: Double = 99.0
+    public static let minScreenZoom: Double = -99.0
+    public static let maxScreenZoom: Double = 99.0
     
     // Screen
     @Published public var screenTilt: Double = 0.0

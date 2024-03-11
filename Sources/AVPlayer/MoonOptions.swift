@@ -358,7 +358,7 @@ open class MoonOptions {
     }
 
 //    private var lastMediaTime = CACurrentMediaTime()
-    open func videoClockSync(main: KSClock, nextVideoTime: TimeInterval, fps: Float, frameCount: Int) -> (Double, ClockProcessType) {
+    open func videoClockSync(main: TrackClock, nextVideoTime: TimeInterval, fps: Float, frameCount: Int) -> (Double, ClockProcessType) {
         var desire = main.getTime() - videoDelay
         #if !os(macOS)
         desire -= AVAudioSession.sharedInstance().outputLatency
@@ -661,7 +661,7 @@ public extension Array {
     }
 }
 
-public struct KSClock {
+public struct TrackClock {
     public private(set) var lastMediaTime = CACurrentMediaTime()
     public internal(set) var positionTime = CMTime.zero {
         didSet {

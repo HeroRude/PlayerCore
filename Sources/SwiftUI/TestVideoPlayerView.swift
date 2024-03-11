@@ -9,7 +9,7 @@ import MediaPlayer
 import SwiftUI
 
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
-public struct KSVideoPlayerView: View {
+public struct TestVideoPlayerView: View {
     private let subtitleDataSouce: SubtitleDataSouce?
     private let onPlayerDisappear: ((MoonPlayerLayer?) -> Void)?
     @State
@@ -572,10 +572,10 @@ public struct PlatformView<Content: View>: View {
 }
 
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, *)
-struct KSVideoPlayerView_Previews: PreviewProvider {
+struct VideoPlayerView_Previews: PreviewProvider {
     static var previews: some View {
         let url = URL(string: "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4")!
-        KSVideoPlayerView(url: url, options: MoonOptions())
+        TestVideoPlayerView(url: url, options: MoonOptions())
     }
 }
 

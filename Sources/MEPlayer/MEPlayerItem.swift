@@ -26,8 +26,8 @@ final class MEPlayerItem {
     private var seekingCompletionHandler: ((Bool) -> Void)?
     // 没有音频数据可以渲染
     private var isAudioStalled = true
-    private var audioClock = KSClock()
-    private var videoClock = KSClock()
+    private var audioClock = TrackClock()
+    private var videoClock = TrackClock()
     private var isFirst = true
     private var isSeek = false
     private var allPlayerItemTracks = [PlayerItemTrackProtocol]()
@@ -748,7 +748,7 @@ extension MEPlayerItem: CodecCapacityDelegate {
 }
 
 extension MEPlayerItem: OutputRenderSourceDelegate {
-    func mainClock() -> KSClock {
+    func mainClock() -> TrackClock {
         isAudioStalled ? videoClock : audioClock
     }
 

@@ -62,9 +62,6 @@ class MetalRender {
         return library
     }()
 
-    private let worldTracking: WorldTrackingProvider
-    private let handTracking: HandTrackingProvider
-    private let arSession: ARKitSession
     private var lastPassDescriptor: MTLRenderPassDescriptor?
     private let immersivePassDescriptor = MTLRenderPassDescriptor()
     private let planePassDescriptor = MTLRenderPassDescriptor()
@@ -134,11 +131,6 @@ class MetalRender {
     }()
 
     public init() {
-        worldTracking = WorldTrackingProvider()
-        handTracking = HandTrackingProvider()
-
-        arSession = ARKitSession()
-        
         rightHandInfo = HandTrackingInfo()
         leftHandInfo = HandTrackingInfo()
         
@@ -153,18 +145,6 @@ class MetalRender {
         depthStateDescriptor.depthCompareFunction = MTLCompareFunction.greater
         depthStateDescriptor.isDepthWriteEnabled = true
         self.depthState = MetalRender.device.makeDepthStencilState(descriptor: depthStateDescriptor)!
-        
-        Task {
-            do {
-                var providers: [DataProvider] = [worldTracking]
-                if HandTrackingProvider.isSupported {
-                    providers.append(handTracking)
-                }
-                try await arSession.run(providers)
-            } catch {
-                fatalError("Failed to initialize ARSession")
-            }
-        }
     }
     
     func clear(drawable: MTLDrawable) {
@@ -236,13 +216,22 @@ class MetalRender {
         frame.startSubmission()
         
         let time = LayerRenderer.Clock.Instant.epoch.duration(to: drawable.frameTiming.presentationTime).timeInterval
-        let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: time)
-        drawable.deviceAnchor = deviceAnchor
+        if let worldTracking = MoonOptions.worldTracking {
+            let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: time)
+            drawable.deviceAnchor = deviceAnchor
+            self.updateDynamicBufferState()
+            self.uniforms[0].uniforms.0 = uniforms(drawable: drawable, deviceAnchor: deviceAnchor, forViewIndex: 0)
+            if drawable.views.count > 1 {
+                self.uniforms[0].uniforms.1 = uniforms(drawable: drawable, deviceAnchor: deviceAnchor, forViewIndex: 1)
+            }
+        }
         
-        let anchors = handTracking.latestAnchors
-        
-        updateHandTrackingInfo(anchors.leftHand, info: &leftHandInfo, atTimestamp: time)
-        updateHandTrackingInfo(anchors.rightHand, info: &rightHandInfo, atTimestamp: time)
+        if let handTracking = MoonOptions.handTracking {
+            let anchors = handTracking.latestAnchors
+            
+            updateHandTrackingInfo(anchors.leftHand, info: &leftHandInfo, atTimestamp: time)
+            updateHandTrackingInfo(anchors.rightHand, info: &rightHandInfo, atTimestamp: time)
+        }
     
         let inputTextures = pixelBuffer.textures()
         lastPassDescriptor = immersivePassDescriptor
@@ -273,11 +262,6 @@ class MetalRender {
         encoder.setRenderPipelineState(state)
         encoder.setDepthStencilState(depthState)
         
-        self.updateDynamicBufferState()
-        self.uniforms[0].uniforms.0 = uniforms(drawable: drawable, deviceAnchor: deviceAnchor, forViewIndex: 0)
-        if drawable.views.count > 1 {
-            self.uniforms[0].uniforms.1 = uniforms(drawable: drawable, deviceAnchor: deviceAnchor, forViewIndex: 1)
-        }
         encoder.setVertexBuffer(dynamicUniformBuffer, offset: uniformBufferOffset, index: 9)
         let viewports = drawable.views.map { $0.textureMap.viewport }
         encoder.setViewports(viewports)

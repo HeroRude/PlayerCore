@@ -548,6 +548,11 @@ public extension MoonOptions {
     static var doubleMiddleTapHandler: () -> Void = {}
 }
 
+public extension MoonOptions {
+    static var worldTracking: WorldTrackingProvider?
+    static var handTracking: HandTrackingProvider?
+}
+
 public enum LogLevel: Int32, CustomStringConvertible {
     case panic = 0
     case fatal = 8

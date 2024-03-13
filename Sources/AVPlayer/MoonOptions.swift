@@ -12,11 +12,14 @@ open class MoonPlaybackSettings {
     public static let maxScreenHeight: Double = 99.0
     public static let minScreenZoom: Double = -99.0
     public static let maxScreenZoom: Double = 99.0
+    public static let minIPD: Float = -50.0
+    public static let maxIPD: Float = 50.0
     
     // Screen
     @Published public var screenTilt: Double = 0.0
     @Published public var screenHeight: Double = 0.0
     @Published public var screenZoom: Double = 0.0
+    @Published public var ipd: Float = 0.0
     
     @Published public var swapEyes: Bool = false
     

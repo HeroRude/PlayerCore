@@ -365,6 +365,10 @@ extension MEPlayerItem {
                 let rotation = first.rotation
                 if rotation > 0, options.autoRotate {
                     options.hardwareDecode = false
+                    let toRemove = ["transpose","vflip","hflip","rotate"]
+                    options.videoFilters = options.videoFilters.filter { element in
+                        !toRemove.contains(where: element.contains)
+                    }
                     if abs(rotation - 90) <= 1 {
                         options.videoFilters.append("transpose=clock")
                     } else if abs(rotation - 180) <= 1 {
@@ -375,6 +379,9 @@ extension MEPlayerItem {
                     } else if abs(rotation) > 1 {
                         options.videoFilters.append("rotate=\(rotation)*PI/180")
                     }
+                } else {
+                    options.hardwareDecode = true
+                    options.videoFilters.append("rotate=0")
                 }
                 naturalSize = abs(rotation - 90) <= 1 || abs(rotation - 270) <= 1 ? first.naturalSize.reverse : first.naturalSize
                 options.process(assetTrack: first)

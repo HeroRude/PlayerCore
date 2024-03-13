@@ -16,6 +16,7 @@ import Spatial
 struct CustomData {
     public var stereoMode: Int32 = 0
     public var swapEyes: Int32 = 0
+    public var ipd: Float = 0
 }
 
 struct HandTrackingInfo {
@@ -296,6 +297,7 @@ class MetalRender {
     func updateCustomDataBuffer() {
         MetalRender.customBuffer.stereoMode = Int32((MetalRender.options?.stereo.rawValue)!)
         MetalRender.customBuffer.swapEyes = (MetalRender.options?.playbackSettings.swapEyes)! ? 1:0
+        MetalRender.customBuffer.ipd = MetalRender.options?.playbackSettings.ipd ?? 0.0
         let bufferPointer = customDataBuffer?.contents()
         bufferPointer!.copyMemory(from: &MetalRender.customBuffer, byteCount: MemoryLayout<CustomData>.size)
     }

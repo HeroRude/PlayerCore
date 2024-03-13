@@ -21,6 +21,7 @@ constant float4x4 scaleTBMatrix = float4x4(
 typedef struct {
     int stereoMode;
     int swapEyes;
+    float ipd;
 } CustomData;
 
 typedef struct
@@ -72,16 +73,18 @@ vertex VertexOut mapTexture(VertexIn input [[stage_in]],
         scaleFactor = scale * scaleTBMatrix;
     }
     
-    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * scaleFactor * float4(input.pos, 1.0);
+    float4 pos = uniforms.projectionMatrix * uniforms.modelViewMatrix * scaleFactor * float4(input.pos, 1.0);
     float2 texCoord = input.uv;
     
     if (customData.stereoMode == 1 || customData.stereoMode == 3) {
         if (ampId == 0) {
+            pos.x = pos.x + customData.ipd;
             texCoord.x = texCoord.x * 0.5;
             if (customData.swapEyes == 1) {
                 texCoord.x = texCoord.x + 0.5;
             }
         } else {
+            pos.x = pos.x - customData.ipd;
             texCoord.x = texCoord.x * 0.5 + 0.5;
             if (customData.swapEyes == 1) {
                 texCoord.x = texCoord.x - 0.5;
@@ -101,6 +104,7 @@ vertex VertexOut mapTexture(VertexIn input [[stage_in]],
         }
     }
     
+    outVertex.renderedCoordinate = pos;
     outVertex.textureCoordinate = texCoord;
     return outVertex;
 }
@@ -112,16 +116,18 @@ vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]],
     VertexOut outVertex;
     Uniforms uniforms = uniformsArray.uniforms[ampId];
     
-    outVertex.renderedCoordinate = uniforms.projectionMatrix * uniforms.modelViewMatrix * float4(input.pos, 1.0);
+    float4 pos = uniforms.projectionMatrix * uniforms.modelViewMatrix * float4(input.pos, 1.0);
     float2 texCoord = input.uv;
     
     if (customData.stereoMode == 1 || customData.stereoMode == 3) {
         if (ampId == 0) {
+            pos.x = pos.x + customData.ipd;
             texCoord.x = texCoord.x * 0.5;
             if (customData.swapEyes == 1) {
                 texCoord.x = texCoord.x + 0.5;
             }
         } else {
+            pos.x = pos.x - customData.ipd;
             texCoord.x = texCoord.x * 0.5 + 0.5;
             if (customData.swapEyes == 1) {
                 texCoord.x = texCoord.x - 0.5;
@@ -141,6 +147,7 @@ vertex VertexOut mapSphereTexture(VertexIn input [[stage_in]],
         }
     }
     
+    outVertex.renderedCoordinate = pos;
     outVertex.textureCoordinate = texCoord;
     
     return outVertex;

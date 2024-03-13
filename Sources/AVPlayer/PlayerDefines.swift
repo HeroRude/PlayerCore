@@ -133,8 +133,9 @@ public extension FourCharCode {
 
 public enum DisplayEnum: Int {
     case plane = 0
+    case immersive = 1
     // swiftlint:disable identifier_name
-    case sphere = 1
+    case sphere = 2
     // swiftlint:enable identifier_name
     case dome = 3
     case fisheye180 = 4

@@ -272,7 +272,7 @@ extension MetalPlayView {
                     displayView.displayLayer.flushAndRemoveImage()
                 }
                 let size: CGSize
-                if options.display == .plane {
+                if options.display == .plane || options.display == .immersive {
                     if let dar = options.customizeDar(sar: sar, par: par) {
                         size = CGSize(width: par.width, height: par.width * dar.height / dar.width)
                     } else {
@@ -303,7 +303,7 @@ extension MetalPlayView {
                     displayView.displayLayer.flushAndRemoveImage()
                 }
                 let size: CGSize
-                if options.display == .plane {
+                if options.display == .plane || options.display == .immersive {
                     if let dar = options.customizeDar(sar: sar, par: par) {
                         size = CGSize(width: par.width, height: par.width * dar.height / dar.width)
                     } else {

@@ -28,6 +28,8 @@ extension DisplayEnum {
         switch self {
         case .plane:
             DisplayEnum.planeDisplay.set(encoder: encoder, size: size)
+        case .immersive:
+            DisplayEnum.planeDisplay.set(encoder: encoder, size: size)
         case .sphere:
             DisplayEnum.sphereDisplay.set(encoder: encoder, size: size)
         case .dome:
@@ -48,6 +50,8 @@ extension DisplayEnum {
     func pipeline(planeCount: Int, bitDepth: Int32) -> MTLRenderPipelineState {
         switch self {
         case .plane:
+            return DisplayEnum.planeDisplay.pipeline(planeCount: planeCount, bitDepth: bitDepth)
+        case .immersive:
             return DisplayEnum.planeDisplay.pipeline(planeCount: planeCount, bitDepth: bitDepth)
         case .sphere:
             return DisplayEnum.sphereDisplay.pipeline(planeCount: planeCount, bitDepth: bitDepth)

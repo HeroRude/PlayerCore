@@ -381,7 +381,10 @@ extension MEPlayerItem {
                     }
                 } else {
                     options.hardwareDecode = true
-                    options.videoFilters.append("rotate=0")
+                    let toRemove = ["transpose","vflip","hflip","rotate"]
+                    options.videoFilters = options.videoFilters.filter { element in
+                        !toRemove.contains(where: element.contains)
+                    }
                 }
                 naturalSize = abs(rotation - 90) <= 1 || abs(rotation - 270) <= 1 ? first.naturalSize.reverse : first.naturalSize
                 options.process(assetTrack: first)

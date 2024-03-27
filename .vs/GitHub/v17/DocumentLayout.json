@@ -1,0 +1,54 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\GitHub\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\GitHub\\Sources\\AVPlayer\\PlayerDefines.swift||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Sources\\AVPlayer\\PlayerDefines.swift||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\GitHub\\Sources\\SwiftUI\\TestVideoPlayerView.swift||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Sources\\SwiftUI\\TestVideoPlayerView.swift||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "TestVideoPlayerView.swift",
+              "DocumentMoniker": "C:\\GitHub\\Sources\\SwiftUI\\TestVideoPlayerView.swift",
+              "RelativeDocumentMoniker": "Sources\\SwiftUI\\TestVideoPlayerView.swift",
+              "ToolTip": "C:\\GitHub\\Sources\\SwiftUI\\TestVideoPlayerView.swift",
+              "RelativeToolTip": "Sources\\SwiftUI\\TestVideoPlayerView.swift",
+              "ViewState": "AQIAAEMCAAAAAAAAAAAAAFQCAAAHAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-03-26T08:31:28.339Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "PlayerDefines.swift",
+              "DocumentMoniker": "C:\\GitHub\\Sources\\AVPlayer\\PlayerDefines.swift",
+              "RelativeDocumentMoniker": "Sources\\AVPlayer\\PlayerDefines.swift",
+              "ToolTip": "C:\\GitHub\\Sources\\AVPlayer\\PlayerDefines.swift",
+              "RelativeToolTip": "Sources\\AVPlayer\\PlayerDefines.swift",
+              "ViewState": "AQIAAOYCAAAAAAAAAAAAAOwCAAAFAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-03-26T08:30:13.875Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
